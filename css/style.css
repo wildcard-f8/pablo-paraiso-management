@@ -203,6 +203,16 @@ ul, ol { list-style: none; margin: 0; padding: 0; }
 .auth-btn.signed-in .auth-btn__signed-out { display: none; }
 .auth-btn.signed-in .auth-btn__signed-in { display: inline; }
 
+/* Auth button attention animation (used after 401 prompts) */
+.auth-btn.pulse {
+  animation: pulse 1.5s ease-in-out 2;
+}
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 4px var(--color-primary); }
+  100% { transform: scale(1); }
+}
+
 /* ── Workspace ── */
 .workspace {
   display: grid;

@@ -63,9 +63,22 @@ const app = {
       if (auth.isAuthed()) { auth.signOut(); }
       else { auth.signIn(); }
     });
+
     document.addEventListener("auth:changed", (e) => {
       const authed = e.detail && e.detail.authed;
       btn.classList.toggle("signed-in", authed);
+      /* After sign-in, re-navigate to reload data with the new auth token */
+      if (authed && currentParams && ROUTES[currentParams.page]) {
+        app.navigate(currentParams.page, currentParams.args);
+      }
+    });
+
+    /* Backend returned 401 — prompt the user to sign in */
+    document.addEventListener("auth:required", (e) => {
+      const msg = (e.detail && e.detail.message) || "Please sign in to view this page.";
+      app.showToast(msg, "error");
+      btn.classList.add("pulse");
+      setTimeout(() => btn.classList.remove("pulse"), 6000);
     });
   },
 

@@ -143,7 +143,13 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
   }
 
   if (!payload.success) {
-    throw new Error(payload.error || `Request failed (action=${action})`);
+    /* 401 → backend not authenticated: tell the app to prompt sign-in */
+    if (resp.status === 401) {
+      document.dispatchEvent(new CustomEvent("auth:required", { detail: { message: payload.error } }));
+    }
+    const err = new Error(payload.error || `Request failed (action=${action})`);
+    err.status = resp.status;               /* attach HTTP status for callers */
+    throw err;
   }
   return payload.data;
 }

@@ -7,8 +7,8 @@
  *
  * Deploy as Web App:
  *   - Execute as: "Me" (script owner)
- *   - Who has access: "Anyone, even anonymous"
- *   - Backend URL: https://script.google.com/macros/s/[SCRIPT_ID]/dev
+ *   - Who has access: "Anyone, even anonymous"  ◄ auth is enforced in code
+ *   - Backend URL: https://script.google.com/macros/s/[SCRIPT_ID]/exec
  *
  * All responses: { "success": true, "data": ... } or { "success": false, "error": "..." }
  * ============================================================================
@@ -374,11 +374,93 @@ function deleteRecord(tabName, id) {
 }
 
 
-/* ==========================================================================
- * GET ROUTING — doGet(e)  (action in e.parameter)
- * ========================================================================== */
+/* ==========================================================================\n * AUTHORIZATION — Google Identity Services token verification\n *\n * The frontend sends an access token (from Google Identity Services) in the\n * Authorization: Bearer <token> header. We verify it via Google's tokeninfo\n * endpoint and check the user's email against an allow-list stored in\n * Script Properties (key: AUTHORIZED_USERS — comma-separated emails).\n *\n * Manage the list via the Apps Script editor:\n *   setAuthorizedUsers("user1@gmail.com, user2@company.com")\n * ==========================================================================*/
+
+/**
+ * Returns the list of authorized user emails (lowercased, trimmed).
+ * @return {Array<string>}
+ */
+function getAuthorizedUsers() {
+  var raw = PropertiesService.getScriptProperties().getProperty('AUTHORIZED_USERS') || '';
+  return raw
+    .split(',')
+    .map(function(e) { return e.trim().toLowerCase(); })
+    .filter(function(e) { return e; });
+}
+
+/**
+ * Checks if an email is in the authorized users list.
+ * @param {string} email
+ * @return {boolean}
+ */
+function isUserAuthorized(email) {
+  if (!email) return false;
+  return getAuthorizedUsers().includes(email.toLowerCase());
+}
+
+/**
+ * Sets the authorized users list (comma-separated emails).
+ * Run from the Apps Script editor:
+ *   setAuthorizedUsers("user1@gmail.com, user2@company.com")
+ * @param {string} commaSeparatedEmails
+ */
+function setAuthorizedUsers(commaSeparatedEmails) {
+  PropertiesService.getScriptProperties().setProperty('AUTHORIZED_USERS', commaSeparatedEmails);
+  Logger.log('Authorized users set to: ' + commaSeparatedEmails);
+}
+
+/**
+ * Verifies the GIS access token in the Authorization header and checks
+ * if the user is authorized. Returns an auth result object.
+ * @param {Object} e — the doGet/doPost event parameter
+ * @return {{valid: boolean, email: ?string, status: number, error: ?string}}
+ */
+function requireAuth(e) {
+  // Extract Authorization header (try common casing)
+  var authHeader = null;
+  if (e && e.headers) {
+    authHeader = e.headers.Authorization || e.headers.authorization;
+  }
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { valid: false, email: null, status: 401, error: 'Authentication required. Please sign in.' };
+  }
+
+  var token = authHeader.substring(7); // strip "Bearer "
+
+  try {
+    var response = UrlFetchApp.fetch(
+      'https://oauth2.googleapis.com/tokeninfo?access_token=' + token
+    );
+    var info = JSON.parse(response.getContentText());
+
+    if (info.error || !info.email) {
+      return { valid: false, email: null, status: 401, error: 'Invalid token. Please sign in again.' };
+    }
+
+    if (!isUserAuthorized(info.email)) {
+      return {
+        valid: false,
+        email: info.email,
+        status: 403,
+        error: info.email + ' is not authorized to access this application. Contact the owner to be added to the allow-list.'
+      };
+    }
+
+    return { valid: true, email: info.email, status: 200, error: null };
+  } catch (err) {
+    return { valid: false, email: null, status: 500, error: 'Token verification failed: ' + err.message };
+  }
+}
+
+/* ==========================================================================\n * GET ROUTING — doGet(e)  (action in e.parameter)\n * ========================================================================== */
 
 function doGet(e) {
+  /* Require valid GIS token + allow-list check */
+  var _ga = requireAuth(e);
+  if (!_ga.valid) {
+    return sendError(_ga.error, _ga.status);
+  }
   try {
     var action = e.parameter.action;
     if (!action) {
@@ -408,6 +490,11 @@ function doGet(e) {
  * ========================================================================== */
 
 function doPost(e) {
+  /* Require valid GIS token + allow-list check */
+  var _ga = requireAuth(e);
+  if (!_ga.valid) {
+    return sendError(_ga.error, _ga.status);
+  }
   try {
     var action = e.parameter.action;
     if (!action) {
