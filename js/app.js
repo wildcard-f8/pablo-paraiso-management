@@ -29,10 +29,8 @@ const ROUTES = {
 
 const app = {
   init() {
-    this.bindShell();
-    this.bindAuth();
-    this.initTheme();
-    this.parseHash();
+    /* Register navigation listeners FIRST — they must survive any
+       downstream error so the sidebar / back-button still work. */
     window.addEventListener("hashchange", () => this.parseHash());
     window.addEventListener("load", () => {
       isFirstLoad = false;
@@ -42,6 +40,15 @@ const app = {
         this.maybeSeed();
       }
     });
+    try {
+      this.bindShell();
+      this.bindAuth();
+      this.initTheme();
+      this.parseHash();  // render initial route
+    } catch (err) {
+      console.error("App init error:", err);
+      this.showToast("Something went wrong. Please refresh the page.", "error");
+    }
   },
 
   bindShell() {
