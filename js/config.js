@@ -21,6 +21,9 @@ export const CONFIG = {
   // Low-stock threshold fallback if the supply record omits it.
   DEFAULT_MIN_STOCK: 10,
 
+  // Currency for amount formatting (ISO 4217 code).
+  CURRENCY: "PHP",
+
   // Demo seed data used only when every sheet is empty (first-run experience).
   DEMO: {
     seedIfEmpty: true,

@@ -15,6 +15,7 @@ const $$ = (sel, ctx = document) => ctx.querySelectorAll(sel);
 
 let currentParams = {};
 let isFirstLoad = true;
+let authErrorActive = false;
 
 /* ── Routing table ── */
 const ROUTES = {
@@ -115,6 +116,7 @@ const app = {
       const authed = e.detail && e.detail.authed;
       btn.classList.toggle("signed-in", authed);
       if (authed) {
+        authErrorActive = false;  // reset debounce flag
         /* Show "verifying..." spinner while we test the token */
         gate.classList.remove("auth-gate__hidden");
         gate.classList.remove("app-authed");
@@ -145,6 +147,9 @@ const app = {
 
     /* Backend returned 401 — token invalid/expired: sign out and prompt sign-in */
     document.addEventListener("auth:required", (e) => {
+      /* Debounce: only show the first auth:required toast until user re-signs-in */
+      if (authErrorActive) return;
+      authErrorActive = true;
       auth.signOut();  // clear stale token so the gate shows "Sign in"
       app.showToast(e.detail?.message || "Please sign in to view this page.", "info");
       btn.classList.add("pulse");
@@ -337,7 +342,11 @@ const app = {
     const container = $("#toastContainer");
     const t = document.createElement("div");
     t.className = `toast ${type}`;
-    t.textContent = message;
+    t.innerHTML = `<span class="toast__msg">${message}</span><button class="toast__close" aria-label="Close">&times;</button>`;
+    t.querySelector(".toast__close").addEventListener("click", () => {
+      t.classList.remove("show");
+      t.addEventListener("transitionend", () => t.remove(), { once: true });
+    });
     container.appendChild(t);
     requestAnimationFrame(() => t.classList.add("show"));
     setTimeout(() => {
@@ -378,36 +387,83 @@ const app = {
     const isoDate = (d) =>
       `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-    const demoCustomer = "Demo User";
+    // Customers
     await api.post("addCustomer", {
-      name: demoCustomer, email: "demo@example.com", phone: "+1-555-0000",
-      address: "123 Demo St", notes: "Seeded demo customer",
+      name: "Maria Santos", email: "maria@example.com", phone: "+639123456789",
+      address: "Mandaluyong City", notes: "Repeat guest",
+    });
+    await api.post("addCustomer", {
+      name: "Carlos Reyes", email: "carlos@example.com", phone: "+639876543210",
+      address: "Makati City", notes: "",
     });
 
-    // finance entries
+    // Finances — income
     await api.post("addFinance", {
-      date: isoDate(today), type: "income", category: "Booking",
-      description: "Seeded demo income", amount: 15000, bookingId: "B-DEMO",
+      date: "2024-02-03", type: "income", category: "Booking",
+      description: "Payment for B0002", amount: 25000, bookingId: "B0002",
     });
     await api.post("addFinance", {
-      date: isoDate(today), type: "expense", category: "Cleaning",
-      description: "Seeded demo expense", amount: 2500, bookingId: "B-DEMO",
+      date: "2024-02-15", type: "income", category: "Booking",
+      description: "Payment for B0003", amount: 30000, bookingId: "B0003",
+    });
+    await api.post("addFinance", {
+      date: "2024-03-01", type: "income", category: "Booking",
+      description: "Payment for B0004", amount: 20000, bookingId: "B0004",
+    });
+    await api.post("addFinance", {
+      date: "2024-03-12", type: "income", category: "Booking",
+      description: "Payment for B0005", amount: 35000, bookingId: "B0005",
     });
 
-    // supplies
+    // Finances — expenses
+    await api.post("addFinance", {
+      date: "2024-02-10", type: "expense", category: "Cleaning",
+      description: "Weekly cleaning service", amount: 1500, bookingId: "",
+    });
+    await api.post("addFinance", {
+      date: "2024-02-20", type: "expense", category: "Utilities",
+      description: "Electricity and water", amount: 3500, bookingId: "",
+    });
+    await api.post("addFinance", {
+      date: "2024-03-05", type: "expense", category: "Maintenance",
+      description: "Pool repair", amount: 5000, bookingId: "",
+    });
+    await api.post("addFinance", {
+      date: "2024-03-18", type: "expense", category: "Supplies",
+      description: "Toiletries restock", amount: 2500, bookingId: "",
+    });
+
+    // Bookings
+    await api.post("addBooking", {
+      customerId: "C0002", property: "Mountain Cabin", checkIn: "2024-02-10",
+      checkOut: "2024-02-14", nights: 4, total: 10000, status: "confirmed", createdAt: "2024-01-15",
+    });
+    await api.post("addBooking", {
+      customerId: "C0003", property: "Lakeside Villa", checkIn: "2024-02-20",
+      checkOut: "2024-02-27", nights: 7, total: 28000, status: "confirmed", createdAt: "2024-02-01",
+    });
+    await api.post("addBooking", {
+      customerId: "C0004", property: "Mountain Cabin", checkIn: "2024-03-05",
+      checkOut: "2024-03-08", nights: 3, total: 7500, status: "pending", createdAt: "2024-02-20",
+    });
+    await api.post("addBooking", {
+      customerId: "C0005", property: "Lakeside Villa", checkIn: "2024-03-15",
+      checkOut: "2024-03-22", nights: 7, total: 35000, status: "confirmed", createdAt: "2024-03-01",
+    });
+
+    // Supplies
     await api.post("addSupply", {
-      name: "Towels", category: "Linens", quantity: 20, unit: "pieces",
-      unitCost: 500, lastOrdered: isoDate(today), supplier: "Demo Supplier", minStock: 10,
+      name: "Shampoo", category: "Bathroom", quantity: 5, unit: "bottles",
+      unitCost: 300, lastOrdered: "2024-02-01", supplier: "CleanCo", minStock: 8,
     });
-
-    // property
-    await api.post("addFinance", {
-      date: isoDate(today), type: "income", category: "Property",
-      description: "Seeded property rent", amount: 0, bookingId: "B-DEMO",
+    await api.post("addSupply", {
+      name: "Coffee Beans", category: "Kitchen", quantity: 2, unit: "kg",
+      unitCost: 800, lastOrdered: "2024-02-15", supplier: "Roastery", minStock: 3,
     });
-
-    // Note: addProperty is not in the SPEC's documented POST endpoints, so we
-    // only seed entities the API contract guarantees (customers/finances/supplies).
+    await api.post("addSupply", {
+      name: "Bed Sheets", category: "Linens", quantity: 12, unit: "sets",
+      unitCost: 1200, lastOrdered: "2024-01-20", supplier: "ABC Supplier", minStock: 6,
+    });
   },
 };
 
@@ -440,7 +496,7 @@ export function utils() {}
 utils.$ = $;
 utils.$$ = $$;
 utils.formatCurrency = (n) =>
-  new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n || 0);
+  new Intl.NumberFormat(undefined, { style: "currency", currency: CONFIG.CURRENCY, maximumFractionDigits: 0 }).format(n || 0);
 utils.formatDate = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" }) : "—");
 utils.formatDateISO = (d) => {
   const y = d.getFullYear();

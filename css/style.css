@@ -53,18 +53,15 @@
   --sidebar-width-collapsed: 72px;
 }
 
-/* Apply light theme */
-:root.theme-light,
-@media (prefers-color-scheme: light) {
-  :root {
-    --color-bg: var(--color-bg-light);
-    --color-surface: var(--color-surface-light);
-    --color-surface-2: var(--color-surface-2-light);
-    --color-border: var(--color-border-light);
-    --color-text: var(--color-text-light);
-    --color-text-dim: var(--color-text-dim-light);
-    --color-text-muted: var(--color-text-muted-light);
-  }
+/* Apply light theme when .theme-light class is on <html> */
+:root.theme-light {
+  --color-bg: var(--color-bg-light);
+  --color-surface: var(--color-surface-light);
+  --color-surface-2: var(--color-surface-2-light);
+  --color-border: var(--color-border-light);
+  --color-text: var(--color-text-light);
+  --color-text-dim: var(--color-text-dim-light);
+  --color-text-muted: var(--color-text-muted-light);
 }
 
 /* Default: dark theme (matches system unless overridden) */
@@ -621,9 +618,35 @@ p { margin: 0 0 var(--space-3); }
   transform: translateX(120%);
   animation: slideIn .25s ease forwards;
   max-width: 360px;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
 }
 .toast.show { opacity: 1; }
 .toast.error { border-left-color: var(--color-danger); }
+.toast__msg { flex: 1; line-height: 1.4; }
+.toast__close {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: color var(--transition), background var(--transition);
+}
+.toast__close:hover {
+  color: var(--color-text);
+  background: var(--color-surface-2);
+}
+.toast.info .toast__close { color: var(--color-primary); }
+.toast.error .toast__close { color: var(--color-danger); }
 @keyframes slideIn {
   to { opacity: 1; transform: translateX(0); }
 }

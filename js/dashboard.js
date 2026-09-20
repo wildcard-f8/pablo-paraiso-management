@@ -95,9 +95,14 @@ async function loadDashboard() {
 
     renderCharts(finances, bookings, supplies, properties, customers);
   } catch (err) {
-    app.showToast(`Failed to load dashboard: ${err.message}`, "error");
+    /* If the error is auth-related, the auth:required/auth:denied handler
+       already showed the appropriate toast — don't double-notify. */
+    const msg = err.message || String(err);
+    if (!msg.includes("Authentication required") && !msg.includes("not authorized") && !msg.includes("Invalid token")) {
+      app.showToast(`Failed to load dashboard: ${msg}`, "error");
+    }
     const s = dashboardRoot && dashboardRoot.querySelector("#statsGrid");
-    if (s) s.innerHTML = `<div class="empty-state"><p>${utils.escapeHTML(utils.capitalize(err.message))}</div></div>`;
+    if (s) s.innerHTML = `<div class="empty-state"><p>${utils.escapeHTML(utils.capitalize(msg))}</div></div>`;
   }
 }
 
@@ -119,7 +124,29 @@ function renderCharts(finances, bookings, supplies, properties, customers) {
         borderRadius: 6,
       }],
     },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: "var(--color-text-muted)" }, grid: { color: "var(--color-border)" } }, x: { ticks: { color: "var(--color-text-muted)" }, grid: { display: false } } } },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "var(--color-surface-2)",
+          titleColor: "var(--color-text)",
+          bodyColor: "var(--color-text-dim)",
+          borderColor: "var(--color-border)",
+          borderWidth: 1,
+        },
+      },
+      scales: {
+        y: {
+          ticks: { color: "var(--color-text-muted)" },
+          grid: { color: "var(--color-border)" },
+        },
+        x: {
+          ticks: { color: "var(--color-text-muted)" },
+          grid: { display: false },
+        },
+      },
+    },
   });
 
   /* Chart 2: Expenses by Category (doughnut) */
@@ -140,7 +167,25 @@ function renderCharts(finances, bookings, supplies, properties, customers) {
         backgroundColor: ["#fbbf24", "#f87171", "#a78bfa", "#3b82f6", "#4ade80", "#facc15"],
       }],
     },
-    options: { responsive: true, plugins: { legend: { position: "bottom", labels: { color: "var(--color-text-muted)" } } } },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: {
+            color: "var(--color-text-dim)",
+            padding: 16,
+          },
+        },
+        tooltip: {
+          backgroundColor: "var(--color-surface-2)",
+          titleColor: "var(--color-text)",
+          bodyColor: "var(--color-text-dim)",
+          borderColor: "var(--color-border)",
+          borderWidth: 1,
+        },
+      },
+    },
   });
 
   /* Chart 3: Booking Income Over Time (line) */
@@ -164,9 +209,32 @@ function renderCharts(finances, bookings, supplies, properties, customers) {
         tension: 0.35,
         fill: true,
         pointRadius: 3,
+        pointBackgroundColor: "#3b82f6",
       }],
     },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: "var(--color-text-muted)" }, grid: { color: "var(--color-border)" } }, x: { ticks: { color: "var(--color-text-muted)" }, grid: { display: false } } } },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "var(--color-surface-2)",
+          titleColor: "var(--color-text)",
+          bodyColor: "var(--color-text-dim)",
+          borderColor: "var(--color-border)",
+          borderWidth: 1,
+        },
+      },
+      scales: {
+        y: {
+          ticks: { color: "var(--color-text-muted)" },
+          grid: { color: "var(--color-border)" },
+        },
+        x: {
+          ticks: { color: "var(--color-text-muted)" },
+          grid: { display: false },
+        },
+      },
+    },
   });
 
   /* Chart 4: Property Performance (bar) — total booking value per property */
@@ -187,7 +255,30 @@ function renderCharts(finances, bookings, supplies, properties, customers) {
         borderRadius: 6,
       }],
     },
-    options: { responsive: true, indexAxis: "y", plugins: { legend: { display: false } }, scales: { x: { ticks: { color: "var(--color-text-muted)" }, grid: { color: "var(--color-border)" } }, y: { ticks: { color: "var(--color-text-muted)" }, grid: { display: false } } } },
+    options: {
+      responsive: true,
+      indexAxis: "y",
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "var(--color-surface-2)",
+          titleColor: "var(--color-text)",
+          bodyColor: "var(--color-text-dim)",
+          borderColor: "var(--color-border)",
+          borderWidth: 1,
+        },
+      },
+      scales: {
+        x: {
+          ticks: { color: "var(--color-text-muted)" },
+          grid: { color: "var(--color-border)" },
+        },
+        y: {
+          ticks: { color: "var(--color-text-muted)" },
+          grid: { display: false },
+        },
+      },
+    },
   });
 }
 

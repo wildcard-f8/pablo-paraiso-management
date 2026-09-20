@@ -896,14 +896,25 @@ function seedDatabase() {
   financesSheet.appendRow(HEADERS.Finances);
   financesSheet.appendRow(['F0001', '2024-01-15', 'income', 'Booking', 'Payment for B0001', 15000, 'B0001']);
   financesSheet.appendRow(['F0002', '2024-01-20', 'expense', 'Supplies', 'Towels and linens', 2000, '']);
+  financesSheet.appendRow(['F0003', '2024-02-03', 'income', 'Booking', 'Payment for B0002', 25000, 'B0002']);
+  financesSheet.appendRow(['F0004', '2024-02-10', 'expense', 'Cleaning', 'Weekly cleaning service', 1500, '']);
+  financesSheet.appendRow(['F0005', '2024-02-15', 'income', 'Booking', 'Payment for B0003', 30000, 'B0003']);
+  financesSheet.appendRow(['F0006', '2024-02-20', 'expense', 'Utilities', 'Electricity and water', 3500, '']);
+  financesSheet.appendRow(['F0007', '2024-03-01', 'income', 'Booking', 'Payment for B0004', 20000, 'B0004']);
+  financesSheet.appendRow(['F0008', '2024-03-05', 'expense', 'Maintenance', 'Pool repair', 5000, '']);
+  financesSheet.appendRow(['F0009', '2024-03-12', 'income', 'Booking', 'Payment for B0005', 35000, 'B0005']);
+  financesSheet.appendRow(['F0010', '2024-03-18', 'expense', 'Supplies', 'Toiletries restock', 2500, '']);
 
   // --- Customers ---
   var customersSheet = spreadsheet.getSheetByName('Customers') ||
     spreadsheet.insertSheet('Customers');
   customersSheet.clear();
   customersSheet.appendRow(HEADERS.Customers);
-  customersSheet.appendRow(['C0001', 'John Smith', 'john@example.com', '+1234567890', '123 Main St', 'VIP']);
-  customersSheet.appendRow(['C0002', 'Jane Doe', 'jane@example.com', '+1987654321', '456 Oak Ave', '']);
+  customersSheet.appendRow(['C0001', 'John Smith', 'john@example.com', '+123****7890', '123 Main St', 'VIP']);
+  customersSheet.appendRow(['C0002', 'Jane Doe', 'jane@example.com', '+198****4321', '456 Oak Ave', '']);
+  customersSheet.appendRow(['C0003', 'Maria Santos', 'maria@example.com', '+639****1234', 'Mandaluyong City', 'Repeat']);
+  customersSheet.appendRow(['C0004', 'Carlos Reyes', 'carlos@example.com', '+639****5678', 'Makati City', '']);
+  customersSheet.appendRow(['C0005', 'Anna Petrov', 'anna@example.com', '+141****9012', '123 Lake View', 'VIP']);
 
   // --- Bookings ---
   var bookingsSheet = spreadsheet.getSheetByName('Bookings') ||
@@ -911,6 +922,10 @@ function seedDatabase() {
   bookingsSheet.clear();
   bookingsSheet.appendRow(HEADERS.Bookings);
   bookingsSheet.appendRow(['B0001', 'C0001', 'Lakeside Villa', '2024-01-20', '2024-01-25', 5, 15000, 'confirmed', '2024-01-01']);
+  bookingsSheet.appendRow(['B0002', 'C0002', 'Mountain Cabin', '2024-02-10', '2024-02-14', 4, 10000, 'confirmed', '2024-01-15']);
+  bookingsSheet.appendRow(['B0003', 'C0003', 'Lakeside Villa', '2024-02-20', '2024-02-27', 7, 28000, 'confirmed', '2024-02-01']);
+  bookingsSheet.appendRow(['B0004', 'C0004', 'Mountain Cabin', '2024-03-05', '2024-03-08', 3, 7500, 'pending', '2024-02-20']);
+  bookingsSheet.appendRow(['B0005', 'C0005', 'Lakeside Villa', '2024-03-15', '2024-03-22', 7, 35000, 'confirmed', '2024-03-01']);
 
   // --- Supplies ---
   var suppliesSheet = spreadsheet.getSheetByName('Supplies') ||
@@ -919,6 +934,9 @@ function seedDatabase() {
   suppliesSheet.appendRow(HEADERS.Supplies);
   suppliesSheet.appendRow(['S0001', 'Towels', 'Linens', 20, 'pieces', 500, '2024-01-01', 'ABC Supplier', 10]);
   suppliesSheet.appendRow(['S0002', 'Toilet Paper', 'Essentials', 50, 'rolls', 200, '2024-01-10', 'ABC Supplier', 20]);
+  suppliesSheet.appendRow(['S0003', 'Shampoo', 'Bathroom', 5, 'bottles', 300, '2024-02-01', 'CleanCo', 8]);
+  suppliesSheet.appendRow(['S0004', 'Coffee Beans', 'Kitchen', 2, 'kg', 800, '2024-02-15', 'Roastery', 3]);
+  suppliesSheet.appendRow(['S0005', 'Bed Sheets', 'Linens', 12, 'sets', 1200, '2024-01-20', 'ABC Supplier', 6]);
 
   // --- Properties ---
   var propertiesSheet = spreadsheet.getSheetByName('Properties') ||
