@@ -8,7 +8,7 @@ export const CONFIG = {
 
   // Google Identity Services OAuth 2.0 Client ID. Create one at:
   // https://console.cloud.google.com/ -> APIs & Services -> Credentials
-  GOOGLE_CLIENT_ID: "[GOOGLE_CLIENT_ID].apps.googleusercontent.com",
+  GOOGLE_CLIENT_ID: "106840707748-shd83c7efjufadl2eq3sdgk5grcrplk7.apps.googleusercontent.com",
 
   // Optional application title shown in the browser tab / header.
   APP_NAME: "Retreat Management",
