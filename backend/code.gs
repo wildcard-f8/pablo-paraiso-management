@@ -400,13 +400,13 @@ function isUserAuthorized(email) {
 
 /**
  * Sets the authorized users list (comma-separated emails).
- * Run from the Apps Script editor:
- *   setAuthorizedUsers("user1@gmail.com, user2@company.com")
- * @param {string} commaSeparatedEmails
+ * Run from the Apps Script editor — edit the email list below first,
+ * then click ▶. The list is stored in Script Properties.
  */
-function setAuthorizedUsers(commaSeparatedEmails) {
-  PropertiesService.getScriptProperties().setProperty('AUTHORIZED_USERS', commaSeparatedEmails);
-  Logger.log('Authorized users set to: ' + commaSeparatedEmails);
+function setAuthorizedUsers() {
+  var emails = "your-email@gmail.com, teammate@company.com";  /* ← EDIT THIS LINE */
+  PropertiesService.getScriptProperties().setProperty('AUTHORIZED_USERS', emails);
+  Logger.log('Authorized users set to: ' + emails);
 }
 
 /**

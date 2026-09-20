@@ -113,15 +113,14 @@ message in the UI.
 To set the allow-list:
 
 1. Open your Apps Script project at `script.google.com`.
-2. In the Apps Script editor's left sidebar, open **Executions** or
-   **Logs** → select `setAuthorizedUsers` from the function dropdown.
-3. Edit the function call to include the emails of users who should have
-   access (comma-separated, in any case):
+2. In the Apps Script editor, select `setAuthorizedUsers` from the
+   function dropdown.
+3. **Edit the email list** inside the function (the line with `/* ← EDIT THIS LINE */`):
    ```js
-   setAuthorizedUsers("you@gmail.com, teammate@company.com, manager@retreat.com")
+   var emails = "your-email@gmail.com, teammate@company.com, manager@retreat.com";
    ```
 4. Click **▶ Run** → review and grant permissions if prompted.
-5. The allow-list is now stored in **Script Properties** and persists
+5. The allow-list is stored in **Script Properties** and persists
    across deployments.
 
 To view the current allow-list at any time:
