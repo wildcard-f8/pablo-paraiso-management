@@ -341,7 +341,7 @@ ul, ol { list-style: none; margin: 0; padding: 0; }
 .page {
   flex: 1;
   padding: var(--space-6);
-  overflow-x: hidden;
+  min-width: 0; /* critical: lets grid children shrink below content intrinsic size */
 }
 @media (max-width: 600px) {
   .page { padding: var(--space-4); }
@@ -365,20 +365,22 @@ p { margin: 0 0 var(--space-3); }
 .card:hover { box-shadow: var(--shadow-lg); }
 .card--stat {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: var(--space-2);
   padding: var(--space-5);
+  min-width: 0; /* allow text to shrink */
 }
 .card__label {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-text-muted);
-  margin-bottom: var(--space-2);
+  margin-bottom: 0;
 }
 .card__value {
-  font-size: 1.75rem;
+  font-size: 1.4rem;
   font-weight: 700;
+  line-height: 1.2;
 }
 .card__trend {
   font-size: 0.8rem;
@@ -386,6 +388,13 @@ p { margin: 0 0 var(--space-3); }
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  line-height: 1.3;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+@media (max-width: 500px) {
+  .card__value { font-size: 1.15rem; }
+  .card--stat { padding: var(--space-4); }
 }
 
 /* ── Summary cards grid ── */
@@ -394,6 +403,7 @@ p { margin: 0 0 var(--space-3); }
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: var(--space-4);
   margin-bottom: var(--space-6);
+  min-width: 0; /* allow grid to shrink within the page slot */
 }
 @media (max-width: 500px) {
   .stats-grid { grid-template-columns: 1fr 1fr; }
