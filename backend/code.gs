@@ -201,7 +201,10 @@ function sendSuccess(data) {
  */
 function sendError(message, status) {
   status = status || 400;
-  return sendJson({ success: false, error: message }, status);
+  /* Note: Apps Script ContentService always returns HTTP 200 — the status code
+     cannot be set via createTextOutput(). We embed it in the JSON body so
+     the frontend can distinguish 401 (re-auth) from 403 (not authorized). */
+  return sendJson({ success: false, error: message, status: status }, 200);
 }
 
 
@@ -454,15 +457,23 @@ function requireAuth(e) {
   }
 
   try {
-    var response = UrlFetchApp.fetch(
+    var info = null;
+    var endpoints = [
       'https://oauth2.googleapis.com/tokeninfo?id_token=' + token,
-      { muteHttpExceptions: true }
-    );
-    var code = response.getResponseCode();
-    if (code !== 200) {
+      'https://oauth2.googleapis.com/tokeninfo?access_token=' + token
+    ];
+    for (var i = 0; i < endpoints.length; i++) {
+      var response = UrlFetchApp.fetch(endpoints[i], { muteHttpExceptions: true });
+      var code = response.getResponseCode();
+      if (code === 200) {
+        info = JSON.parse(response.getContentText());
+        break;
+      }
+      // 400 on this endpoint — try the other parameter
+    }
+    if (!info) {
       return { valid: false, email: null, status: 401, error: 'Invalid token. Please sign in again.' };
     }
-    var info = JSON.parse(response.getContentText());
     if (info.error || !info.email) {
       return { valid: false, email: null, status: 401, error: 'Invalid token. Please sign in again.' };
     }

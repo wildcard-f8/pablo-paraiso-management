@@ -79,7 +79,7 @@ export const auth = {
     if (!tokenClient) {
       initGis();
     }
-    tokenClient?.requestAccessToken({ prompt: "consent" });
+    tokenClient?.requestAccessToken({ prompt: "login" });
   },
 
   signOut() {
@@ -154,16 +154,19 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
   }
 
   if (!payload.success) {
+    /* Apps Script ContentService always returns HTTP 200 — the real status
+       code is embedded in the JSON body (payload.status). Check both. */
+    const statusCode = payload.status || resp.status;
     /* 401 → backend not authenticated: tell the app to prompt sign-in */
-    if (resp.status === 401) {
+    if (statusCode === 401) {
       document.dispatchEvent(new CustomEvent("auth:required", { detail: { message: payload.error } }));
     }
     /* 403 → signed in but not on the allow-list */
-    if (resp.status === 403) {
+    if (statusCode === 403) {
       document.dispatchEvent(new CustomEvent("auth:denied", { detail: { message: payload.error } }));
     }
     const err = new Error(payload.error || `Request failed (action=${action})`);
-    err.status = resp.status;               /* attach HTTP status for callers */
+    err.status = statusCode;
     throw err;
   }
   return payload.data;
