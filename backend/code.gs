@@ -389,7 +389,7 @@ function deleteRecord(tabName, id) {
 }
 
 
-/* ==========================================================================\\n * AUTHORIZATION — Google Identity Services token verification\\n *\\n * The frontend sends the GIS access token as a _token **query parameter**\\n * (not in the Authorization header) so that the browser treats each request\\n * as a CORS "simple request" and skips the OPTIONS preflight.\\n * Google Apps Script's web-app proxy does not return CORS headers on OPTIONS\\n * responses, so preflight-based requests fail with "Failed to fetch".\\n * Simple requests bypass the proxy's OPTIONS handling entirely.\\n *\\n * For POST requests, Content-Type is sent as text/plain (a "simple" Content-Type)\\n * so the body is also treated as a simple request.\\n *\\n * The backend still accepts the Authorization: Bearer header as a fallback.\\n *\\n * Token is verified via Google's oauth2.googleapis.com/tokeninfo endpoint\\n * and the user's email is checked against an allow-list stored in Script\\n * Properties (key: AUTHORIZED_USERS — comma-separated emails).\\n *\\n * Manage the allow-list via the Apps Script editor:\\n *   setAuthorizedUsers()   — edits the email list in code and clicks ▶\\n *   or edit PropertiesService.getScriptProperties().setProperty('AUTHORIZED_USERS', ...)\\n * ==========================================================================*/
+/* ==========================================================================\\n * AUTHORIZATION — Google Identity Services token verification\\n *\\n * The frontend sends the GIS access token as a _token **query parameter**\\n * (not in the Authorization header) so that the browser treats each request\\n * as a CORS "simple request" and skips the OPTIONS preflight.\\n * Google Apps Script's web-app proxy does not return CORS headers on OPTIONS\\n * responses, so preflight-based requests fail with "Failed to fetch".\\n * Simple requests bypass the proxy's OPTIONS handling entirely.\\n *\\n * For POST requests, Content-Type is sent as text/plain (a "simple" Content-Type)\\n * so the body is also treated as a simple request.\\n *\\n * The backend still accepts the Authorization: Bearer header as a fallback.\\n *\\n * Token is verified via Google's oauth2.googleapis.com/tokeninfo?id_token= endpoint\\n * and the user's email is checked against an allow-list stored in Script\\n * Properties (key: AUTHORIZED_USERS — comma-separated emails).\\n *\\n * Manage the allow-list via the Apps Script editor:\\n *   setAuthorizedUsers()   — edits the email list in code and clicks ▶\\n *   or edit PropertiesService.getScriptProperties().setProperty('AUTHORIZED_USERS', ...)\\n * ==========================================================================*/
 
 /**
  * Returns the list of authorized user emails (lowercased, trimmed).
@@ -455,10 +455,14 @@ function requireAuth(e) {
 
   try {
     var response = UrlFetchApp.fetch(
-      'https://oauth2.googleapis.com/tokeninfo?access_token=' + token
+      'https://oauth2.googleapis.com/tokeninfo?id_token=' + token,
+      { muteHttpExceptions: true }
     );
+    var code = response.getResponseCode();
+    if (code !== 200) {
+      return { valid: false, email: null, status: 401, error: 'Invalid token. Please sign in again.' };
+    }
     var info = JSON.parse(response.getContentText());
-
     if (info.error || !info.email) {
       return { valid: false, email: null, status: 401, error: 'Invalid token. Please sign in again.' };
     }

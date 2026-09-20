@@ -37,7 +37,7 @@ function initGis() {
     client_id: CONFIG.GOOGLE_CLIENT_ID,
     scope: "openid email profile",
     callback: (response) => {
-      idToken = response?.access_token || response?.id_token || null;
+      idToken = response?.id_token || response?.access_token || null;
       persistToken(idToken);
       document.dispatchEvent(new CustomEvent("auth:changed", { detail: { authed: !!idToken } }));
     },
