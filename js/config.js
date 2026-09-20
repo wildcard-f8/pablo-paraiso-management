@@ -6,7 +6,7 @@ export const CONFIG = {
   // Google Apps Script web app URL (published deployment).
   // Deploy at script.google.com → Deploy → Web app → "Anyone, even anonymous"
   // (auth is enforced in code via requireAuth()).
-  API_BASE_URL: "https://script.google.com/macros/s/AKfycbzfgSj6RXHCUDg8_6qStQM4IoMURxpMVGNqPv0rKBIVMLgDO_WpWZbg1xVbg1xVbg1xVbg1xVbg1xVbg1xVbg1xVbg1xVgahTRLrFP/exec",
+  API_BASE_URL: "https://script.google.com/macros/s/AKfycbzfgSj6RXHCUDg8_6qStQM4IoMURxpMVGNqPv0rKBIVMLgDO_WpWZbg1xVgahTRLrFP/exec",
 
   // Google Identity Services OAuth 2.0 Client ID. Create one at:
   // https://console.cloud.google.com/ -> APIs & Services -> Credentials
