@@ -4,6 +4,7 @@
 */
 import { api } from "./auth.js";
 import { utils, app } from "./app.js";
+import { CONFIG } from "./config.js";
 
 let charts = {};
 let dashboardRoot = null;
@@ -115,7 +116,7 @@ function renderCharts(finances, bookings, supplies, properties, customers) {
     data: {
       labels: ["Revenue", "Expenses"],
       datasets: [{
-        label: "Amount (USD)",
+        label: `Amount (${CONFIG.CURRENCY})`,
         data: [
           finances.filter((f) => f.type === "income").reduce((s, f) => s + Number(f.amount || 0), 0),
           finances.filter((f) => f.type === "expense").reduce((s, f) => s + Number(f.amount || 0), 0),
@@ -202,7 +203,7 @@ function renderCharts(finances, bookings, supplies, properties, customers) {
     data: {
       labels: sortedDates.length ? sortedDates : ["No data"],
       datasets: [{
-        label: "Income (USD)",
+        label: `Income (${CONFIG.CURRENCY})`,
         data: sortedDates.length ? sortedDates.map((d) => incomeByDate[d]) : [0],
         borderColor: "#3b82f6",
         backgroundColor: "rgba(59,130,246,.12)",
@@ -249,7 +250,7 @@ function renderCharts(finances, bookings, supplies, properties, customers) {
     data: {
       labels: pLabels.length ? pLabels : ["No bookings"],
       datasets: [{
-        label: "Total Value (USD)",
+        label: `Total Value (${CONFIG.CURRENCY})`,
         data: pLabels.length ? Object.values(byProp) : [0],
         backgroundColor: "#3b82f6",
         borderRadius: 6,

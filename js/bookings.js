@@ -5,6 +5,7 @@
 import { api } from "./auth.js";
 import { utils, app } from "./app.js";
 import { refreshDashboard } from "./dashboard.js";
+import { CONFIG } from "./config.js";
 
 let container = null;
 let data = [];
@@ -145,7 +146,7 @@ window.appAddBooking = async function () {
       { name: "checkIn", label: "Check-in", type: "date", default: utils.formatDateISO(new Date()), required: true },
       { name: "checkOut", label: "Check-out", type: "date", default: "", required: true },
       { name: "nights", label: "Nights", type: "number", default: "", hint: "Auto-calculated if blank." },
-      { name: "total", label: "Total (USD)", type: "number", default: "", required: true },
+      { name: "total", label: `Total (${CONFIG.CURRENCY})`, type: "number", default: "", required: true },
       { name: "status", label: "Status", type: "select", options: [{ value: "confirmed", label: "Confirmed" }, { value: "pending", label: "Pending" }, { value: "cancelled", label: "Cancelled" }], default: "confirmed", required: true },
     ],
     onSubmit: async (form) => {
@@ -182,7 +183,7 @@ window.appEditBooking = async function (id) {
       { name: "checkIn", label: "Check-in", type: "date", default: b.checkIn || "", required: true },
       { name: "checkOut", label: "Check-out", type: "date", default: b.checkOut || "", required: true },
       { name: "nights", label: "Nights", type: "number", default: b.nights || "" },
-      { name: "total", label: "Total (USD)", type: "number", default: b.total || "", required: true },
+      { name: "total", label: `Total (${CONFIG.CURRENCY})`, type: "number", default: b.total || "", required: true },
       { name: "status", label: "Status", type: "select", options: [{ value: "confirmed", label: "Confirmed" }, { value: "pending", label: "Pending" }, { value: "cancelled", label: "Cancelled" }], default: b.status || "confirmed", required: true },
     ],
     onSubmit: async (form) => {

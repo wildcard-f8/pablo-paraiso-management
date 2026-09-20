@@ -136,7 +136,7 @@ function supplyFields(s) {
     { name: "category", label: "Category", type: "text", default: s?.category || "" },
     { name: "quantity", label: "Quantity On Hand", type: "number", default: s?.quantity || 0, required: true },
     { name: "unit", label: "Unit", type: "text", default: s?.unit || "pieces" },
-    { name: "unitCost", label: "Unit Cost (USD)", type: "number", default: s?.unitCost || 0, hint: "Used to compute stock value." },
+    { name: "unitCost", label: `Unit Cost (${CONFIG.CURRENCY})`, type: "number", default: s?.unitCost || 0, hint: "Used to compute stock value." },
     { name: "lastOrdered", label: "Last Ordered", type: "date", default: s?.lastOrdered || utils.formatDateISO(new Date()) },
     { name: "supplier", label: "Supplier", type: "text", default: s?.supplier || "" },
     { name: "minStock", label: "Minimum Stock", type: "number", default: s?.minStock ?? CONFIG.DEFAULT_MIN_STOCK, hint: "Trigger for low-stock alert." },

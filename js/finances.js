@@ -5,6 +5,7 @@
 import { api } from "./auth.js";
 import { utils, app } from "./app.js";
 import { refreshDashboard } from "./dashboard.js";
+import { CONFIG } from "./config.js";
 
 let tableEl = null;
 let chart = null;
@@ -144,7 +145,21 @@ function renderChart() {
     },
     options: {
       responsive: true,
-      plugins: { legend: { position: "top" } },
+      plugins: {
+        legend: {
+          position: "top",
+          labels: {
+            color: "var(--color-text-dim)",
+          },
+        },
+        tooltip: {
+          backgroundColor: "var(--color-surface-2)",
+          titleColor: "var(--color-text)",
+          bodyColor: "var(--color-text-dim)",
+          borderColor: "var(--color-border)",
+          borderWidth: 1,
+        },
+      },
       scales: {
         x: { stacked: true, ticks: { color: "var(--color-text-muted)" }, grid: { display: false } },
         y: { stacked: true, ticks: { color: "var(--color-text-muted)" }, grid: { color: "var(--color-border)" } },
@@ -163,7 +178,7 @@ window.appAddFinance = function () {
       { name: "type", label: "Type", type: "select", options: [{ value: "income", label: "Income" }, { value: "expense", label: "Expense" }], default: "income", required: true },
       { name: "category", label: "Category", type: "text", default: "Booking" },
       { name: "description", label: "Description", tag: "textarea", default: "" },
-      { name: "amount", label: "Amount (USD)", type: "number", default: "", required: true },
+      { name: "amount", label: `Amount (${CONFIG.CURRENCY})`, type: "number", default: "", required: true },
       { name: "bookingId", label: "Booking ID (optional)", type: "text", default: "" },
     ],
     onSubmit: async (form) => {
@@ -193,7 +208,7 @@ window.appEditFinance = async function (id) {
       { name: "type", label: "Type", type: "select", options: [{ value: "income", label: "Income" }, { value: "expense", label: "Expense" }], default: record.type || "income", required: true },
       { name: "category", label: "Category", type: "text", default: record.category || "" },
       { name: "description", label: "Description", tag: "textarea", default: record.description || "" },
-      { name: "amount", label: "Amount (USD)", type: "number", default: record.amount || "", required: true },
+      { name: "amount", label: `Amount (${CONFIG.CURRENCY})`, type: "number", default: record.amount || "", required: true },
       { name: "bookingId", label: "Booking ID", type: "text", default: record.bookingId || "" },
     ],
     onSubmit: async (form) => {
