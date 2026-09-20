@@ -72,16 +72,59 @@ function corsHeaders() {
 > `getProperties` at startup. Ensure the `Properties` tab exists (it can be
 > empty on a fresh sheet).
 
-## Google Identity Services (GIS)
+## Google Identity Services (OAuth 2.0)
 
-1. In [Google Cloud Console](https://console.cloud.google.com/) create an
-   **OAuth 2.0 Client ID** for "Web application".
-2. Add your GitHub Pages domain to **Authorized JavaScript origins**.
-3. Paste the client ID into `js/config.js` → `GOOGLE_CLIENT_ID`.
+The app supports **optional** Google sign-in. The auth button (`#authBtn` in
+`index.html`) toggles between "Sign in" and "Sign out" based on the
+`auth:changed` event dispatched by `auth.js`.
 
-Auth is **optional**: if GIS isn't configured, the app still loads from the
-backend (which can be set to "Anyone, even anonymous"). When GIS is active,
-the Bearer token is forwarded on every request via `auth.getToken()`.
+### Step-by-step setup
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/) →
+   **APIs & Services** → **Credentials**.
+2. Click **+ Create credentials** → **OAuth client ID** →
+   **Web application**.
+3. Under **Authorized JavaScript origins**, add your GitHub Pages URL, e.g.:
+   ```
+   https://wildcard-f8.github.io
+   ```
+4. Under **Authorized redirect URIs**, add:
+   ```
+   https://wildcard-f8.github.io/retreat-management/
+   ```
+   *(Not strictly required for GIS — GIS uses a pop-up, not redirects —
+   but it does not hurt to include it.)*
+4. Click **Create**. Copy the **Client ID** (looks like
+   `XXXXXXXXXXXX-XXXXXXXXXX.apps.googleusercontent.com`).
+5. Paste it into `js/config.js`:
+   ```js
+   GOOGLE_CLIENT_ID: "XXXXXXXXXXXX-XXXXXXXXXX.apps.googleusercontent.com",
+   ```
+6. Commit & push — GitHub Pages redeploys automatically.
+
+### What happens when GIS is configured
+
+| Event | What fires | What the button does |
+|---|---|---|
+| `auth.init()` | Loads `https://accounts.google.com/gsi/client`, restores token from `localStorage` | — |
+| User clicks **#authBtn** (signed out) | `auth.signIn()` → `tokenClient.requestAccessToken({ prompt: "consent" })` | Button label flips to "Sign out" (CSS `.signed-in` class toggles) |
+| User clicks **#authBtn** (signed in) | `auth.signOut()` → clears token, dispatches `auth:changed` | Button label flips to "Sign in" |
+| `auth:changed` event | `app.bindAuth()` listens and toggles `.signed-in` class on `#authBtn` | — |
+| Every `fetchGAS()` call | If `auth.getToken()` is truthy, adds `Authorization: Bearer <token>` header | Token forwarded to backend |
+
+### Backend token validation (optional)
+
+By default the backend (`code.gs`) is deployed as **"Anyone, even anonymous"**.
+The `Authorization` header is forwarded but not validated. For user-level
+access control:
+
+1. In Apps Script, change `Session.getEffectiveUser()` checks or inspect
+   `e.parameter` for the Bearer token.
+2. Change the web-app **Who has access** to **"Anyone with Google account"**.
+3. Users must sign in before they can call the API.
+
+The app degrades gracefully: if `GOOGLE_CLIENT_ID` is still `[GOOGLE_CLIENT_ID]`
+(or empty), GIS is skipped and the app works against an anonymous backend.
 
 ## First-run seeding
 
