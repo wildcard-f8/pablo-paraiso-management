@@ -2,8 +2,8 @@
    Endpoints: getCustomers, addCustomer, updateCustomer, deleteCustomer.
    Model: {id,name,email,phone,address,notes}
 */
-import { api } from "./auth.js";
-import { utils } from "./utils.js";
+import { api } from "./auth.js?v=9";
+import { utils } from "./utils.js?v=9";
 
 let container = null;
 let data = [];

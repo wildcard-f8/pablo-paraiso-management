@@ -370,6 +370,7 @@ p { margin: 0 0 var(--space-3); }
   padding: var(--space-5);
   min-width: 0; /* allow text to shrink */
 }
+.card--stat > * { min-width: 0; }
 .card__label {
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -679,9 +680,26 @@ p { margin: 0 0 var(--space-3); }
 /* FullCalendar overrides for dark theme */
 :root .fc {
   --fc-border-color: var(--color-border);
-  --fc-daygrid-event-dot-width: 1em;
+  --fc-view-harness-border-color: var(--color-border);
+  --fc-view-harness-bg-color: var(--color-bg);
+  --fc-page-bg-color: var(--color-bg);
+  --fc-neutral-bg-color: var(--color-surface);
+  --fc-neutral-border-dark: var(--color-border);
+  --fc-neutral-border-light: var(--color-border);
+  --fc-event-bg-color: var(--color-surface);
   --fc-event-body-color: var(--color-surface);
   --fc-event-border-color: var(--color-surface);
+  --fc-event-text-color: var(--color-text);
+  --fc-event-accent-color: var(--color-primary);
+  --fc-today-bg-color: rgba(59, 130, 246, .1);
+  --fc-today-border-color: var(--color-primary);
+  --fc-button-bg-color: var(--color-surface);
+  --fc-button-border-color: var(--color-border);
+  --fc-button-text-color: var(--color-text);
+  --fc-toolbar-title-color: var(--color-text);
+  --fc-tab-color: var(--color-text);
+  --fc-list-event-dot-width: 1em;
+  --fc-daygrid-event-dot-width: 1em;
 }
 .fc .fc-view-harness { min-height: 300px; }
 

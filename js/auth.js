@@ -9,7 +9,7 @@
    Usage: auth.init() boots GIS; auth.isAuthed() returns bool;
           auth.api(action, body) => Promise<data>.
 */
-import { CONFIG } from "./config.js";
+import { CONFIG } from "./config.js?v=9";
 
 const TOKEN_KEY = "paraiso_gis_token";
 
@@ -178,15 +178,65 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
 }
 
 /** Convenience API object: get/post/del helpers around fetchGAS. */
+
+/* ─── Response cache ───
+   GET responses are cached for 60s so navigating between pages
+   doesn't hit the GAS backend (cold-start ~1-2s) repeatedly.
+   POST/DELETE automatically invalidate the cache. */
+const CACHE_TTL_MS = 60_000;
+const cache = new Map(); // key → { data, timestamp }
+
+function cacheKey(action, query) {
+  if (!query) return action;
+  return action + "?" + Object.entries(query)
+    .filter(([_, v]) => v != null && v !== "")
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([k, v]) => `${k}=${v}`)
+    .join("&");
+}
+
+function cacheGet(key) {
+  const hit = cache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.timestamp > CACHE_TTL_MS) {
+    cache.delete(key);
+    return null;
+  }
+  return hit.data;
+}
+
+function cacheSet(key, data) {
+  cache.set(key, { data, timestamp: Date.now() });
+}
+
+function invalidateCache(pattern) {
+  if (!pattern) { cache.clear(); return; }
+  for (const key of cache.keys()) {
+    if (key === pattern || key.startsWith(pattern)) cache.delete(key);
+  }
+}
+
 export const api = {
-  get(action, query) {
-    return fetchGAS(action, { method: "GET", query });
+  async get(action, query) {
+    const key = cacheKey(action, query);
+    const cached = cacheGet(key);
+    if (cached) return cached;
+    const data = await fetchGAS(action, { method: "GET", query });
+    cacheSet(key, data);
+    return data;
   },
-  post(action, data) {
-    return fetchGAS(action, { method: "POST", body: data });
+  async post(action, data) {
+    const result = await fetchGAS(action, { method: "POST", body: data });
+    /* Invalidate cached GETs for the affected resource */
+    const singular = { addCustomer: "getCustomers", updateCustomer: "getCustomers", deleteCustomer: "getCustomers",
+      addFinance: "getFinances", updateFinance: "getFinances", deleteFinance: "getFinances",
+      addBooking: "getBookings", updateBooking: "getBookings", deleteBooking: "getBookings",
+      addSupply: "getSupplies", updateSupply: "getSupplies", deleteSupply: "getSupplies" };
+    if (singular[action]) invalidateCache(singular[action]);
+    return result;
   },
   del(action, data) {
-    return fetchGAS(action, { method: "POST", body: data });
+    return api.post(action, data);
   },
 };
 

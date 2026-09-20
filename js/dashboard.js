@@ -1,14 +1,33 @@
 /* dashboard.js - Dashboard: summary cards + Chart.js visuals.
    Charts: revenue vs expenses (bar), booking income over time (line),
-          expenses by category (doughnut), property performance (bar).
+           expenses by category (doughnut), bookings by status (doughnut).
 */
-import { api } from "./auth.js";
-import { utils } from "./utils.js";
-import { CONFIG } from "./config.js";
+import { api } from "./auth.js?v=9";
+import { utils } from "./utils.js?v=9";
+import { CONFIG } from "./config.js?v=9";
 
 let charts = {};
 let dashboardRoot = null;
 let appRef = null;
+
+/* Resolve a CSS custom property to its actual computed value so Chart.js
+   can use it. Chart.js does NOT understand CSS variables on its own —
+   passing "var(--color-text-dim)" results in a fallback of black. */
+function resolveColor(cssVar) {
+  const val = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
+  return val || "#000000";
+}
+
+/* Theme-aware color palette for charts */
+function chartColors() {
+  return {
+    text:   resolveColor("--color-text"),
+    textDim: resolveColor("--color-text-dim"),
+    border: resolveColor("--color-border"),
+    surface: resolveColor("--color-surface-2"),
+    grid:   resolveColor("--color-border"),
+  };
+}
 
 export function createDashboard(_args, ref) {
   appRef = ref;
@@ -38,7 +57,7 @@ export function createDashboard(_args, ref) {
         <canvas id="chartBookingIncome" height="150"></canvas>
       </div>
       <div class="card chart-card">
-        <h3>Property Performance</h3>
+        <h3>Bookings by Status</h3>
         <canvas id="chartPropertyPerformance" height="160"></canvas>
       </div>
     </div>
@@ -64,12 +83,11 @@ async function loadDashboard() {
   const slot = dashboardRoot && dashboardRoot.querySelector("#statsGrid");
   if (!slot) return;
   try {
-    const [finances, bookings, customers, supplies, properties] = await Promise.all([
+    const [finances, bookings, customers, supplies] = await Promise.all([
       api.get("getFinances"),
       api.get("getBookings"),
       api.get("getCustomers"),
       api.get("getSupplies"),
-      api.get("getProperties"),
     ]);
 
     const income = finances.filter((f) => f.type === "income");
@@ -96,7 +114,7 @@ async function loadDashboard() {
       ? `Net positive: ${utils.formatCurrency(net)}`
       : `Net negative: ${utils.formatCurrency(Math.abs(net))}`;
 
-    renderCharts(finances, bookings, supplies, properties, customers);
+    renderCharts(finances, bookings, supplies, customers);
   } catch (err) {
     /* If the error is auth-related, the auth:required/auth:denied handler
        already showed the appropriate toast — don't double-notify. */
@@ -109,8 +127,9 @@ async function loadDashboard() {
   }
 }
 
-function renderCharts(finances, bookings, supplies, properties, customers) {
+function renderCharts(finances, bookings, supplies, customers) {
   const ctx = (id) => document.getElementById(id);
+  const C = chartColors();
 
   /* Chart 1: Revenue vs Expenses (bar) */
   charts.revenue = new Chart(ctx("chartRevenueExpenses"), {
@@ -132,20 +151,20 @@ function renderCharts(finances, bookings, supplies, properties, customers) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: "var(--color-surface-2)",
-          titleColor: "var(--color-text)",
-          bodyColor: "var(--color-text-dim)",
-          borderColor: "var(--color-border)",
+          backgroundColor: C.surface,
+          titleColor: C.text,
+          bodyColor: C.textDim,
+          borderColor: C.border,
           borderWidth: 1,
         },
       },
       scales: {
         y: {
-          ticks: { color: "var(--color-text-dim)" },
-          grid: { color: "var(--color-border)" },
+          ticks: { color: C.textDim },
+          grid: { color: C.grid },
         },
         x: {
-          ticks: { color: "var(--color-text-dim)" },
+          ticks: { color: C.textDim },
           grid: { display: false },
         },
       },
@@ -176,15 +195,15 @@ function renderCharts(finances, bookings, supplies, properties, customers) {
         legend: {
           position: "bottom",
           labels: {
-            color: "var(--color-text-dim)",
+            color: C.textDim,
             padding: 16,
           },
         },
         tooltip: {
-          backgroundColor: "var(--color-surface-2)",
-          titleColor: "var(--color-text)",
-          bodyColor: "var(--color-text-dim)",
-          borderColor: "var(--color-border)",
+          backgroundColor: C.surface,
+          titleColor: C.text,
+          bodyColor: C.textDim,
+          borderColor: C.border,
           borderWidth: 1,
         },
       },
@@ -220,65 +239,68 @@ function renderCharts(finances, bookings, supplies, properties, customers) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: "var(--color-surface-2)",
-          titleColor: "var(--color-text)",
-          bodyColor: "var(--color-text-dim)",
-          borderColor: "var(--color-border)",
+          backgroundColor: C.surface,
+          titleColor: C.text,
+          bodyColor: C.textDim,
+          borderColor: C.border,
           borderWidth: 1,
         },
       },
       scales: {
         y: {
-          ticks: { color: "var(--color-text-dim)" },
-          grid: { color: "var(--color-border)" },
+          ticks: { color: C.textDim },
+          grid: { color: C.grid },
         },
         x: {
-          ticks: { color: "var(--color-text-dim)" },
+          ticks: { color: C.textDim },
           grid: { display: false },
         },
       },
     },
   });
 
-  /* Chart 4: Property Performance (bar) — total booking value per property */
-  const byProp = bookings.reduce((acc, b) => {
-    const key = b.property || "Unknown";
-    acc[key] = (acc[key] || 0) + Number(b.total || 0);
+  /* Chart 4: Bookings by Status (doughnut) — replaces Property Performance,
+     which was meaningless with a single property. */
+  const byStatus = bookings.reduce((acc, b) => {
+    const key = b.status || "unknown";
+    acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
-  const pLabels = Object.keys(byProp);
-  charts.property = new Chart(ctx("chartPropertyPerformance"), {
-    type: "bar",
+  const statusLabels = Object.keys(byStatus);
+  const statusColors = {
+    confirmed: "#4ade80",
+    pending: "#fbbf24",
+    cancelled: "#f87171",
+    completed: "#3b82f6",
+    unknown: "#9ca3af",
+  };
+  charts.status = new Chart(ctx("chartPropertyPerformance"), {
+    type: "doughnut",
     data: {
-      labels: pLabels.length ? pLabels : ["No bookings"],
+      labels: statusLabels.length ? statusLabels : ["No bookings"],
       datasets: [{
-        label: `Total Value (${CONFIG.CURRENCY})`,
-        data: pLabels.length ? Object.values(byProp) : [0],
-        backgroundColor: "#3b82f6",
-        borderRadius: 6,
+        data: statusLabels.length ? statusLabels.map((s) => byStatus[s]) : [0],
+        backgroundColor: statusLabels.map((s) => statusColors[s] || "#9ca3af"),
       }],
     },
     options: {
       responsive: true,
-      indexAxis: "y",
       plugins: {
-        legend: { display: false },
+        legend: {
+          position: "bottom",
+          labels: {
+            color: C.textDim,
+            padding: 16,
+            usePointStyle: true,
+            pointStyle: "circle",
+          },
+        },
         tooltip: {
-          backgroundColor: "var(--color-surface-2)",
-          titleColor: "var(--color-text)",
-          bodyColor: "var(--color-text-dim)",
-          borderColor: "var(--color-border)",
+          backgroundColor: C.surface,
+          titleColor: C.text,
+          bodyColor: C.textDim,
+          borderColor: C.border,
           borderWidth: 1,
-        },
-      },
-      scales: {
-        x: {
-          ticks: { color: "var(--color-text-dim)" },
-          grid: { color: "var(--color-border)" },
-        },
-        y: {
-          ticks: { color: "var(--color-text-dim)" },
-          grid: { display: false },
         },
       },
     },
@@ -292,27 +314,28 @@ export function refreshDashboard() {
 export function refreshCharts() {
   Object.values(charts).forEach((c) => {
     if (!c) return;
-    /* Rebuild options with fresh CSS variable colours so charts stay legible
+    /* Rebuild options with fresh resolved colours so charts stay legible
        after a theme switch without re-rendering data. */
+    const C = chartColors();
     const opts = c.options;
     if (opts.scales) {
       ["x", "y"].forEach((axis) => {
         if (opts.scales[axis]) {
-          if (opts.scales[axis].ticks) opts.scales[axis].ticks.color = "var(--color-text-dim)";
+          if (opts.scales[axis].ticks) opts.scales[axis].ticks.color = C.textDim;
           if (opts.scales[axis].grid) {
-            opts.scales[axis].grid.color = axis === "x" ? "var(--color-border)" : "var(--color-border)";
+            opts.scales[axis].grid.color = C.grid;
           }
         }
       });
     }
     if (opts.plugins && opts.plugins.tooltip) {
-      opts.plugins.tooltip.backgroundColor = "var(--color-surface-2)";
-      opts.plugins.tooltip.titleColor = "var(--color-text)";
-      opts.plugins.tooltip.bodyColor = "var(--color-text-dim)";
-      opts.plugins.tooltip.borderColor = "var(--color-border)";
+      opts.plugins.tooltip.backgroundColor = C.surface;
+      opts.plugins.tooltip.titleColor = C.text;
+      opts.plugins.tooltip.bodyColor = C.textDim;
+      opts.plugins.tooltip.borderColor = C.border;
     }
     if (opts.plugins && opts.plugins.legend && opts.plugins.legend.labels) {
-      opts.plugins.legend.labels.color = "var(--color-text-dim)";
+      opts.plugins.legend.labels.color = C.textDim;
     }
     c.update();
   });

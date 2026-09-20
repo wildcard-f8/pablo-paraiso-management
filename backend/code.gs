@@ -1323,11 +1323,11 @@ function seedDatabase() {
     spreadsheet.insertSheet('Bookings');
   bookingsSheet.clear();
   bookingsSheet.appendRow(HEADERS.Bookings);
-  bookingsSheet.appendRow(['B0001', 'C0001', 'Lakeside Villa', '2024-01-20', '2024-01-25', 5, 15000, 'confirmed', '2024-01-01', 'Pool Party', 20, '', '']);
-  bookingsSheet.appendRow(['B0002', 'C0002', 'Mountain Cabin', '2024-02-10', '2024-02-14', 4, 10000, 'confirmed', '2024-01-15', 'Birthday Celebration', 15, '', '']);
-  bookingsSheet.appendRow(['B0003', 'C0003', 'Lakeside Villa', '2024-02-20', '2024-02-27', 7, 28000, 'confirmed', '2024-02-01', 'Family Gathering', 30, '', '']);
-  bookingsSheet.appendRow(['B0004', 'C0004', 'Mountain Cabin', '2024-03-05', '2024-03-08', 3, 7500, 'pending', '2024-02-20', 'Team Building', 12, '', '']);
-  bookingsSheet.appendRow(['B0005', 'C0005', 'Lakeside Villa', '2024-03-15', '2024-03-22', 7, 35000, 'confirmed', '2024-03-01', 'Pool Party', 25, '', '']);
+  bookingsSheet.appendRow(['B0001', 'C0001', 'Pablo Paraiso Pool House', '2024-01-20', '2024-01-25', 5, 15000, 'confirmed', '2024-01-01', 'Pool Party', 20, '', '']);
+  bookingsSheet.appendRow(['B0002', 'C0002', 'Pablo Paraiso Pool House', '2024-02-10', '2024-02-14', 4, 10000, 'confirmed', '2024-01-15', 'Birthday Celebration', 15, '', '']);
+  bookingsSheet.appendRow(['B0003', 'C0003', 'Pablo Paraiso Pool House', '2024-02-20', '2024-02-27', 7, 28000, 'confirmed', '2024-02-01', 'Family Gathering', 30, '', '']);
+  bookingsSheet.appendRow(['B0004', 'C0004', 'Pablo Paraiso Pool House', '2024-03-05', '2024-03-08', 3, 7500, 'pending', '2024-02-20', 'Team Building', 12, '', '']);
+  bookingsSheet.appendRow(['B0005', 'C0005', 'Pablo Paraiso Pool House', '2024-03-15', '2024-03-22', 7, 35000, 'confirmed', '2024-03-01', 'Pool Party', 25, '', '']);
 
   // --- Supplies ---
   var suppliesSheet = spreadsheet.getSheetByName('Supplies') ||
@@ -1340,13 +1340,12 @@ function seedDatabase() {
   suppliesSheet.appendRow(['S0004', 'Coffee Beans', 'Kitchen', 2, 'kg', 800, '2024-02-15', 'Roastery', 3]);
   suppliesSheet.appendRow(['S0005', 'Bed Sheets', 'Linens', 12, 'sets', 1200, '2024-01-20', 'ABC Supplier', 6]);
 
-  // --- Properties ---
+  // --- Properties (single venue: Pablo Paraiso Pool House) ---
   var propertiesSheet = spreadsheet.getSheetByName('Properties') ||
     spreadsheet.insertSheet('Properties');
   propertiesSheet.clear();
   propertiesSheet.appendRow(HEADERS.Properties);
-  propertiesSheet.appendRow(['P0001', 'Lakeside Villa', '123 Lake View', 6, 3000]);
-  propertiesSheet.appendRow(['P0002', 'Mountain Cabin', '456 Mountain Rd', 4, 2500]);
+  propertiesSheet.appendRow(['P0001', 'Pablo Paraiso Pool House', 'Lakeside Paradise, Laguna de Bay', 30, 0]);
 
   // --- Config ---
   var configSheet = spreadsheet.getSheetByName('Config') ||

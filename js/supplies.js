@@ -2,9 +2,9 @@
    Endpoints: getSupplies, addSupply, updateSupply, deleteSupply.
    Model: {id, name, category, quantity, unit, unitCost, lastOrdered, supplier, minStock}
 */
-import { api } from "./auth.js";
-import { utils } from "./utils.js";
-import { CONFIG } from "./config.js";
+import { api } from "./auth.js?v=9";
+import { utils } from "./utils.js?v=9";
+import { CONFIG } from "./config.js?v=9";
 
 let container = null;
 let data = [];

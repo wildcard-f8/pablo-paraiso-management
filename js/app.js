@@ -1,15 +1,15 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js";
-import { api, auth } from "./auth.js";
-import { utils, $, $$ } from "./utils.js";
-import { createDashboard } from "./dashboard.js";
-import { createFinances } from "./finances.js";
-import { createCustomers } from "./customers.js";
-import { createBookings } from "./bookings.js";
-import { createCalendar } from "./calendar.js";
-import { createSupplies } from "./supplies.js";
+import { CONFIG } from "./config.js?v=9";
+import { api, auth } from "./auth.js?v=9";
+import { utils, $, $$ } from "./utils.js?v=9";
+import { createDashboard } from "./dashboard.js?v=9";
+import { createFinances } from "./finances.js?v=9";
+import { createCustomers } from "./customers.js?v=9";
+import { createBookings } from "./bookings.js?v=9";
+import { createCalendar } from "./calendar.js?v=9";
+import { createSupplies } from "./supplies.js?v=9";
 
 
 let currentParams = {};
@@ -37,6 +37,11 @@ const app = {
       /* Only welcome + seed when the user is authenticated */
       if (auth.isAuthed()) {
         this.showToast(`Welcome to ${CONFIG.APP_NAME}`, "info");
+        /* On first load, maybeSeed() may run. API responses are cached
+           (see auth.js cache), so by the time the dashboard loads its
+           own data, all GET calls are served from cache — no redundant
+           network round-trips to the GAS backend (which has cold-start
+           latency of ~1-2s). */
         this.maybeSeed();
       }
     });
@@ -505,7 +510,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js";
+export { utils, $, $$ } from "./utils.js?v=9";
 
 /* Export app and default */
 export { app };

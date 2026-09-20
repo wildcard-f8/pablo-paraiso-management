@@ -2,10 +2,10 @@
    Endpoints: getBookings, addBooking, updateBooking, deleteBooking, getProperties, getCustomers.
    Model: {id, customerId, property, checkIn, checkOut, nights, total, status}
 */
-import { api } from "./auth.js";
-import { utils } from "./utils.js";
-import { refreshDashboard } from "./dashboard.js";
-import { CONFIG } from "./config.js";
+import { api } from "./auth.js?v=9";
+import { utils } from "./utils.js?v=9";
+import { refreshDashboard } from "./dashboard.js?v=9";
+import { CONFIG } from "./config.js?v=9";
 
 let container = null;
 let appRef = null;
