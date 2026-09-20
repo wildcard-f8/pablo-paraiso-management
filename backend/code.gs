@@ -425,8 +425,9 @@ function setAuthorizedUsers() {
 }
 
 /**
- * Verifies the GIS access token in the Authorization header and checks
- * if the user is authorized. Returns an auth result object.
+ * Verifies the GIS access token and checks if the user is authorized.
+ * Token is read from the _token query parameter (primary) or the
+ * Authorization: Bearer header (fallback). Returns an auth result object.
  * @param {Object} e — the doGet/doPost event parameter
  * @return {{valid: boolean, email: ?string, status: number, error: ?string}}
  */
