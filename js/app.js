@@ -2,7 +2,7 @@
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
 import { CONFIG } from "./config.js";
-import { api } from "./auth.js";
+import { api, auth } from "./auth.js";
 import { createDashboard } from "./dashboard.js";
 import { createFinances } from "./finances.js";
 import { createCustomers } from "./customers.js";
@@ -30,6 +30,7 @@ const ROUTES = {
 const app = {
   init() {
     this.bindShell();
+    this.bindAuth();
     this.initTheme();
     this.parseHash();
     window.addEventListener("hashchange", () => this.parseHash());
@@ -52,6 +53,20 @@ const app = {
       if (e.target === $("#modalOverlay")) app.closeModal();
     });
     $("#themeToggle").addEventListener("click", () => app.toggleTheme());
+  },
+
+  /* -- Auth (Google Identity Services) -- */
+  bindAuth() {
+    auth.init();
+    const btn = $("#authBtn");
+    btn.addEventListener("click", () => {
+      if (auth.isAuthed()) { auth.signOut(); }
+      else { auth.signIn(); }
+    });
+    document.addEventListener("auth:changed", (e) => {
+      const authed = e.detail && e.detail.authed;
+      btn.classList.toggle("signed-in", authed);
+    });
   },
 
   parseHash() {
