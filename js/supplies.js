@@ -3,18 +3,20 @@
    Model: {id, name, category, quantity, unit, unitCost, lastOrdered, supplier, minStock}
 */
 import { api } from "./auth.js";
-import { utils, app } from "./app.js";
+import { utils } from "./utils.js";
 import { CONFIG } from "./config.js";
 
 let container = null;
 let data = [];
+let appRef = null;
 let searchTerm = "";
 
 function buildColumns() {
   return ["Name", "Category", "Quantity", "Unit", "Unit Cost", "Stock Value", "Last Ordered", "Supplier", "Min Stock"];
 }
 
-export function createSupplies(_args, appRef) {
+export function createSupplies(_args, ref) {
+  appRef = ref;
   const section = document.createElement("section");
   section.className = "supplies-page";
   section.innerHTML = `
@@ -38,7 +40,7 @@ export function createSupplies(_args, appRef) {
     renderTable();
   });
 
-  loadSupplies().catch((err) => app.showToast(`Load failed: ${err.message}`, "error"));
+  loadSupplies().catch((err) => appRef.showToast(`Load failed: ${err.message}`, "error"));
 
   const unmount = function unmount() { container = null; };
   section._unmount = unmount;
@@ -144,7 +146,7 @@ function supplyFields(s) {
 }
 
 window.appAddSupply = function () {
-  app.openModal({
+  appRef.openModal({
     title: "Add Supply",
     submitLabel: "Add",
     fields: supplyFields(null),
@@ -153,11 +155,11 @@ window.appAddSupply = function () {
         const clean = { ...form, quantity: Number(form.quantity || 0), unitCost: Number(form.unitCost || 0), minStock: Number(form.minStock || 0) };
         delete clean.__k;
         await api.post("addSupply", clean);
-        app.closeModal();
-        app.showToast("Supply added", "info", 1500);
+        appRef.closeModal();
+        appRef.showToast("Supply added", "info", 1500);
         await loadSupplies();
       } catch (err) {
-        app.showToast(`Save failed: ${err.message}`, "error");
+        appRef.showToast(`Save failed: ${err.message}`, "error");
       }
     },
   });
@@ -166,7 +168,7 @@ window.appAddSupply = function () {
 window.appEditSupply = async function (id) {
   const s = data.find((x) => x.id === id);
   if (!s) return;
-  app.openModal({
+  appRef.openModal({
     title: "Edit Supply",
     submitLabel: "Save",
     fields: supplyFields(s),
@@ -175,11 +177,11 @@ window.appEditSupply = async function (id) {
         const clean = { id, ...form, quantity: Number(form.quantity || 0), unitCost: Number(form.unitCost || 0), minStock: Number(form.minStock || 0) };
         delete clean.__k;
         await api.post("updateSupply", clean);
-        app.closeModal();
-        app.showToast("Supply updated", "info", 1500);
+        appRef.closeModal();
+        appRef.showToast("Supply updated", "info", 1500);
         await loadSupplies();
       } catch (err) {
-        app.showToast(`Update failed: ${err.message}`, "error");
+        appRef.showToast(`Update failed: ${err.message}`, "error");
       }
     },
   });
@@ -190,10 +192,10 @@ window.appDeleteSupply = async function (id) {
   if (!utils.confirm(`Delete ${s ? s.name : "supply"}?`)) return;
   try {
     await api.post("deleteSupply", { id });
-    app.showToast("Supply deleted", "info", 1500);
+    appRef.showToast("Supply deleted", "info", 1500);
     await loadSupplies();
   } catch (err) {
-    app.showToast(`Delete failed: ${err.message}`, "error");
+    appRef.showToast(`Delete failed: ${err.message}`, "error");
   }
 };
 

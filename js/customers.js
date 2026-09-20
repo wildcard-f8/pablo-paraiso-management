@@ -3,17 +3,19 @@
    Model: {id,name,email,phone,address,notes}
 */
 import { api } from "./auth.js";
-import { utils, app } from "./app.js";
+import { utils } from "./utils.js";
 
 let container = null;
 let data = [];
 let searchTerm = "";
+let appRef = null;
 
 function buildColumns() {
   return ["Name", "Email", "Phone", "Address"];
 }
 
-export function createCustomers(_args, appRef) {
+export function createCustomers(_args, ref) {
+  appRef = ref;
   const section = document.createElement("section");
   section.className = "customers-page";
   section.innerHTML = `
@@ -31,7 +33,7 @@ export function createCustomers(_args, appRef) {
     renderTable();
   });
 
-  loadCustomers().catch((err) => app.showToast(`Load failed: ${err.message}`, "error"));
+  loadCustomers().catch((err) => appRef.showToast(`Load failed: ${err.message}`, "error"));
 
   const unmount = function unmount() { container = null; };
   section._unmount = unmount;
@@ -98,18 +100,18 @@ function customerFields(c) {
 }
 
 window.appAddCustomer = function () {
-  app.openModal({
+  appRef.openModal({
     title: "Add Customer",
     submitLabel: "Add",
     fields: customerFields(null),
     onSubmit: async (form) => {
       try {
         await api.post("addCustomer", form);
-        app.closeModal();
-        app.showToast("Customer added", "info", 1500);
+        appRef.closeModal();
+        appRef.showToast("Customer added", "info", 1500);
         await loadCustomers();
       } catch (err) {
-        app.showToast(`Save failed: ${err.message}`, "error");
+        appRef.showToast(`Save failed: ${err.message}`, "error");
       }
     },
   });
@@ -118,18 +120,18 @@ window.appAddCustomer = function () {
 window.appEditCustomer = async function (id) {
   const c = data.find((x) => x.id === id);
   if (!c) return;
-  app.openModal({
+  appRef.openModal({
     title: "Edit Customer",
     submitLabel: "Save",
     fields: customerFields(c),
     onSubmit: async (form) => {
       try {
         await api.post("updateCustomer", { id, ...form });
-        app.closeModal();
-        app.showToast("Customer updated", "info", 1500);
+        appRef.closeModal();
+        appRef.showToast("Customer updated", "info", 1500);
         await loadCustomers();
       } catch (err) {
-        app.showToast(`Update failed: ${err.message}`, "error");
+        appRef.showToast(`Update failed: ${err.message}`, "error");
       }
     },
   });
@@ -140,10 +142,10 @@ window.appDeleteCustomer = async function (id) {
   if (!utils.confirm(`Delete ${c ? c.name : "customer"}?`)) return;
   try {
     await api.post("deleteCustomer", { id });
-    app.showToast("Customer deleted", "info", 1500);
+    appRef.showToast("Customer deleted", "info", 1500);
     await loadCustomers();
   } catch (err) {
-    app.showToast(`Delete failed: ${err.message}`, "error");
+    appRef.showToast(`Delete failed: ${err.message}`, "error");
   }
 };
 

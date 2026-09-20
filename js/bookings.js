@@ -3,11 +3,12 @@
    Model: {id, customerId, property, checkIn, checkOut, nights, total, status}
 */
 import { api } from "./auth.js";
-import { utils, app } from "./app.js";
+import { utils } from "./utils.js";
 import { refreshDashboard } from "./dashboard.js";
 import { CONFIG } from "./config.js";
 
 let container = null;
+let appRef = null;
 let data = [];
 let customers = {};
 let properties = {};
@@ -18,7 +19,8 @@ function buildColumns() {
   return ["Customer", "Property", "Check In", "Check Out", "Nights", "Total", "Status"];
 }
 
-export function createBookings(_args, appRef) {
+export function createBookings(_args, ref) {
+  appRef = ref;
   const section = document.createElement("section");
   section.className = "bookings-page";
   section.innerHTML = `
@@ -48,7 +50,7 @@ export function createBookings(_args, appRef) {
     renderTable();
   });
 
-  loadBookings().catch((err) => app.showToast(`Load failed: ${err.message}`, "error"));
+  loadBookings().catch((err) => appRef.showToast(`Load failed: ${err.message}`, "error"));
 
   const unmount = function unmount() { container = null; };
   section._unmount = unmount;
@@ -136,7 +138,7 @@ function propertyOptions() {
 
 window.appAddBooking = async function () {
   if (!Object.keys(customers).length) await loadBookings();
-  app.openModal({
+  appRef.openModal({
     title: "Add Booking",
     submitLabel: "Add",
     size: "fullscreen",
@@ -158,12 +160,12 @@ window.appAddBooking = async function () {
         };
         delete clean.__k;
         await api.post("addBooking", clean);
-        app.closeModal();
-        app.showToast("Booking added", "info", 1500);
+        appRef.closeModal();
+        appRef.showToast("Booking added", "info", 1500);
         await loadBookings();
         refreshDashboard?.();
       } catch (err) {
-        app.showToast(`Save failed: ${err.message}`, "error");
+        appRef.showToast(`Save failed: ${err.message}`, "error");
       }
     },
   });
@@ -173,7 +175,7 @@ window.appEditBooking = async function (id) {
   const b = data.find((x) => x.id === id);
   if (!b) return;
   if (!Object.keys(customers).length) await loadBookings();
-  app.openModal({
+  appRef.openModal({
     title: "Edit Booking",
     submitLabel: "Save",
     size: "fullscreen",
@@ -191,11 +193,11 @@ window.appEditBooking = async function (id) {
         const clean = { id, ...form, nights: form.nights ? Number(form.nights) : 0, total: Number(form.total || 0) };
         delete clean.__k;
         await api.post("updateBooking", clean);
-        app.closeModal();
-        app.showToast("Booking updated", "info", 1500);
+        appRef.closeModal();
+        appRef.showToast("Booking updated", "info", 1500);
         await loadBookings();
       } catch (err) {
-        app.showToast(`Update failed: ${err.message}`, "error");
+        appRef.showToast(`Update failed: ${err.message}`, "error");
       }
     },
   });
@@ -206,17 +208,17 @@ window.appDeleteBooking = async function (id) {
   if (!utils.confirm(`Delete booking ${b?.id}?`)) return;
   try {
     await api.post("deleteBooking", { id });
-    app.showToast("Booking deleted", "info", 1500);
+    appRef.showToast("Booking deleted", "info", 1500);
     await loadBookings();
   } catch (err) {
-    app.showToast(`Delete failed: ${err.message}`, "error");
+    appRef.showToast(`Delete failed: ${err.message}`, "error");
   }
 };
 
 window.appViewBookingInCalendar = function (id) {
   // navigate to calendar and open an informational toast
   window.location.hash = "#/calendar";
-  setTimeout(() => app.showToast(`Find booking ${id} on the calendar.`, "info"), 300);
+  setTimeout(() => appRef.showToast(`Find booking ${id} on the calendar.`, "info"), 300);
 };
 
 export async function refreshBookings() {

@@ -3,14 +3,16 @@
    navigates to the bookings page for that booking.
 */
 import { api } from "./auth.js";
-import { utils, app } from "./app.js";
+import { utils } from "./utils.js";
 
 let calendarRef = null;
 let calendarEl = null;
 let bookings = [];
+let appRef = null;
 let customers = {};
 
-export function createCalendar(_args, appRef) {
+export function createCalendar(_args, ref) {
+  appRef = ref;
   const section = document.createElement("section");
   section.className = "calendar-page";
   section.innerHTML = `
@@ -65,9 +67,9 @@ async function initCalendar() {
         const bookingId = info.event.extendedProps?.bookingId;
         if (bookingId) {
           window.location.hash = "#/bookings";
-          setTimeout(() => app.showToast(`Event: ${info.event.title} (booking ${bookingId})`, "info"), 200);
+          setTimeout(() => appRef.showToast(`Event: ${info.event.title} (booking ${bookingId})`, "info"), 200);
         } else {
-          app.showToast(info.event.title, "info");
+          appRef.showToast(info.event.title, "info");
         }
       },
       select: (info) => {
@@ -83,7 +85,7 @@ async function initCalendar() {
     calendarRef.render();
   } catch (err) {
     calendarEl.innerHTML = `<div class="empty-state"><p>${utils.escapeHTML(err.message)}</p></div>`;
-    app.showToast(`Calendar failed: ${err.message}`, "error");
+    appRef.showToast(`Calendar failed: ${err.message}`, "error");
   }
 }
 
@@ -128,10 +130,10 @@ async function saveEventChange(event, _old) {
       allDay: event.allDay,
       color: event.color,
     });
-    app.showToast("Event updated", "info", 1500);
+    appRef.showToast("Event updated", "info", 1500);
     refreshCalendar();
   } catch (err) {
-    app.showToast(`Update failed: ${err.message}`, "error");
+    appRef.showToast(`Update failed: ${err.message}`, "error");
   }
 }
 
@@ -141,7 +143,7 @@ export function refreshCalendar() {
 
 /* ── Event CRUD via modal ── */
 window.appAddCalendarEvent = function (start, end) {
-  app.openModal({
+  appRef.openModal({
     title: "Add Calendar Event",
     submitLabel: "Add",
     fields: [
@@ -162,11 +164,11 @@ window.appAddCalendarEvent = function (start, end) {
           color: form.color,
           bookingId: form.bookingId || null,
         });
-        app.closeModal();
-        app.showToast("Event added", "info", 1500);
+        appRef.closeModal();
+        appRef.showToast("Event added", "info", 1500);
         refreshCalendar();
       } catch (err) {
-        app.showToast(`Save failed: ${err.message}`, "error");
+        appRef.showToast(`Save failed: ${err.message}`, "error");
       }
     },
   });

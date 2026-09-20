@@ -3,11 +3,12 @@
    Model fields: id, date, type, category, description, amount, bookingId
 */
 import { api } from "./auth.js";
-import { utils, app } from "./app.js";
+import { utils } from "./utils.js";
 import { refreshDashboard } from "./dashboard.js";
 import { CONFIG } from "./config.js";
 
 let tableEl = null;
+let appRef = null;
 let chart = null;
 let data = [];
 let filtered = [];
@@ -23,7 +24,8 @@ function rowActionHandlers(row) {
   return edit + del;
 }
 
-export function createFinances(_args, appRef) {
+export function createFinances(_args, ref) {
+  appRef = ref;
   const section = document.createElement("section");
   section.className = "finances-page";
   section.innerHTML = `
@@ -55,7 +57,7 @@ export function createFinances(_args, appRef) {
     applySearch(e.target.value);
   });
 
-  loadFinances().catch((err) => app.showToast(`Load failed: ${err.message}`, "error"));
+  loadFinances().catch((err) => appRef.showToast(`Load failed: ${err.message}`, "error"));
 
   const unmount = function unmount() {
     if (chart) chart.destroy();
@@ -170,7 +172,7 @@ function renderChart() {
 
 /* ---- Modal CRUD handlers (global for inline onclick) ---- */
 window.appAddFinance = function () {
-  app.openModal({
+  appRef.openModal({
     title: "Add Finance Record",
     submitLabel: "Add",
     fields: [
@@ -186,12 +188,12 @@ window.appAddFinance = function () {
         const clean = { ...form, amount: Number(form.amount) };
         delete clean.__k;
         await api.post("addFinance", clean);
-        app.closeModal();
-        app.showToast("Finance record added", "info", 1500);
+        appRef.closeModal();
+        appRef.showToast("Finance record added", "info", 1500);
         await loadFinances();
         refreshDashboard();
       } catch (err) {
-        app.showToast(`Save failed: ${err.message}`, "error");
+        appRef.showToast(`Save failed: ${err.message}`, "error");
       }
     },
   });
@@ -200,7 +202,7 @@ window.appAddFinance = function () {
 window.appEditFinance = async function (id) {
   const record = data.find((f) => f.id === id);
   if (!record) return;
-  app.openModal({
+  appRef.openModal({
     title: "Edit Finance Record",
     submitLabel: "Save",
     fields: [
@@ -216,12 +218,12 @@ window.appEditFinance = async function (id) {
         const clean = { id, ...form, amount: Number(form.amount) };
         delete clean.__k;
         await api.post("updateFinance", clean);
-        app.closeModal();
-        app.showToast("Finance record updated", "info", 1500);
+        appRef.closeModal();
+        appRef.showToast("Finance record updated", "info", 1500);
         await loadFinances();
         refreshDashboard();
       } catch (err) {
-        app.showToast(`Update failed: ${err.message}`, "error");
+        appRef.showToast(`Update failed: ${err.message}`, "error");
       }
     },
   });
@@ -231,11 +233,11 @@ window.appDeleteFinance = async function (id) {
   if (!utils.confirm("Delete this finance record?")) return;
   try {
     await api.post("deleteFinance", { id });
-    app.showToast("Finance record deleted", "info", 1500);
+    appRef.showToast("Finance record deleted", "info", 1500);
     await loadFinances();
     refreshDashboard();
   } catch (err) {
-    app.showToast(`Delete failed: ${err.message}`, "error");
+    appRef.showToast(`Delete failed: ${err.message}`, "error");
   }
 };
 

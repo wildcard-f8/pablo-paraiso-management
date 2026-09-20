@@ -3,13 +3,15 @@
           expenses by category (doughnut), property performance (bar).
 */
 import { api } from "./auth.js";
-import { utils, app } from "./app.js";
+import { utils } from "./utils.js";
 import { CONFIG } from "./config.js";
 
 let charts = {};
 let dashboardRoot = null;
+let appRef = null;
 
-export function createDashboard(_args, appRef) {
+export function createDashboard(_args, ref) {
+  appRef = ref;
   const section = document.createElement("section");
   section.className = "dashboard-page";
   section.innerHTML = `
@@ -100,7 +102,7 @@ async function loadDashboard() {
        already showed the appropriate toast — don't double-notify. */
     const msg = err.message || String(err);
     if (!msg.includes("Authentication required") && !msg.includes("not authorized") && !msg.includes("Invalid token")) {
-      app.showToast(`Failed to load dashboard: ${msg}`, "error");
+      appRef.showToast(`Failed to load dashboard: ${msg}`, "error");
     }
     const s = dashboardRoot && dashboardRoot.querySelector("#statsGrid");
     if (s) s.innerHTML = `<div class="empty-state"><p>${utils.escapeHTML(utils.capitalize(msg))}</div></div>`;

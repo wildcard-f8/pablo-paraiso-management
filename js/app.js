@@ -3,6 +3,7 @@
 */
 import { CONFIG } from "./config.js";
 import { api, auth } from "./auth.js";
+import { utils, $, $$ } from "./utils.js";
 import { createDashboard } from "./dashboard.js";
 import { createFinances } from "./finances.js";
 import { createCustomers } from "./customers.js";
@@ -10,8 +11,6 @@ import { createBookings } from "./bookings.js";
 import { createCalendar } from "./calendar.js";
 import { createSupplies } from "./supplies.js";
 
-const $ = (sel, ctx = document) => ctx.querySelector(sel);
-const $$ = (sel, ctx = document) => ctx.querySelectorAll(sel);
 
 let currentParams = {};
 let isFirstLoad = true;
@@ -183,33 +182,38 @@ const app = {
   },
 
   navigate(pageName, args = []) {
-    if (!ROUTES[pageName]) {
-      this.navigate("dashboard");
-      return;
-    }
-    // close sidebar on mobile after nav
-    $("#sidebar").classList.remove("open");
-    $("#menuBtn").setAttribute("aria-expanded", "false");
+    try {
+      if (!ROUTES[pageName]) {
+        this.navigate("dashboard");
+        return;
+      }
+      // close sidebar on mobile after nav
+      $("#sidebar").classList.remove("open");
+      $("#menuBtn").setAttribute("aria-expanded", "false");
 
-    this.updateNav(pageName);
-    this.setTitle(ROUTES[pageName].label);
+      this.updateNav(pageName);
+      this.setTitle(ROUTES[pageName].label);
 
-    const slot = $("#pageSlot");
-    // Tear down previous view.
-    if (slot._unmount) {
-      slot._unmount();
-      slot._unmount = null;
-    }
-    slot.innerHTML = "";
+      const slot = $("#pageSlot");
+      // Tear down previous view.
+      if (slot._unmount) {
+        slot._unmount();
+        slot._unmount = null;
+      }
+      slot.innerHTML = "";
 
-    // Factory returns the root DOM element (and may attach a _unmount fn).
-    const view = ROUTES[pageName].factory(args, this);
-    if (view && view.nodeType === 1) {
-      if (typeof view._unmount === "function") slot._unmount = view._unmount;
-      slot.appendChild(view);
+      // Factory returns the root DOM element (and may attach a _unmount fn).
+      const view = ROUTES[pageName].factory(args, this);
+      if (view && view.nodeType === 1) {
+        if (typeof view._unmount === "function") slot._unmount = view._unmount;
+        slot.appendChild(view);
+      }
+      // scroll top on navigate
+      window.scrollTo(0, 0);
+    } catch (err) {
+      console.error(`Navigate error (${pageName}):`, err);
+      this.showToast(`Page error: ${err.message}`, "error");
     }
-    // scroll top on navigate
-    window.scrollTo(0, 0);
   },
 
   updateNav(activePage) {
@@ -492,74 +496,12 @@ function createAbout() {
   return el;
 }
 
-/* Shared helpers exported for page modules */
-export function utils() {}
-utils.$ = $;
-utils.$$ = $$;
-utils.formatCurrency = (n) =>
-  new Intl.NumberFormat(undefined, { style: "currency", currency: CONFIG.CURRENCY, maximumFractionDigits: 0 }).format(n || 0);
-utils.formatDate = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" }) : "—");
-utils.formatDateISO = (d) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const da = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${da}`;
-};
-utils.uid = () => Math.random().toString(36).slice(2, 9);
-utils.capitalize = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
-utils.statusPill = (status) => {
-  const cls = {
-    confirmed: "pill pill--confirmed",
-    pending: "pill pill--pending",
-    cancelled: "pill pill--cancelled",
-    paid: "pill pill--paid",
-    overdue: "pill pill--overdue",
-  }[status] || "pill";
-  return `<span class="${cls}">${utils.capitalize(status || "unknown")}</span>`;
-};
-utils.moneyPill = (type) =>
-  `<span class="pill ${type === "income" ? "pill--income" : "pill--expense"}">${utils.capitalize(type)}</span>`;
+/* Shared helpers re-exported for backward compat with modules that
+   import utils from app.js. New code should import from ./utils.js directly. */
+export { utils, $, $$ } from "./utils.js";
 
-/* Confirm dialog (native, but themed via string) */
-utils.confirm = (msg) => window.confirm(msg);
-
-/* Escape HTML helper to avoid injection in generated tables */
-utils.escapeHTML = (str) => {
-  if (str == null) return "";
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-};
-
-/* Generic table builder used by CRUD pages */
-utils.buildTable = (columns, rows, rowActions, emptyMsg = "No records.") => {
-  const t = document.createElement("table");
-  t.className = "table";
-  t.innerHTML = `
-    <thead><tr>${columns.map((c) => `<th>${c}</th>`).join("")}<th class="row-actions-head">Actions</th></tr></thead>
-    <tbody></tbody>
-  `;
-  const tbody = t.querySelector("tbody");
-  if (!rows.length) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="${columns.length + 1}" class="empty-msg">${emptyMsg}</td>`;
-    tbody.appendChild(tr);
-  } else {
-    rows.forEach((row) => {
-      const tr = document.createElement("tr");
-      tr.dataset.id = row.id;
-      tr.innerHTML = `${columns.map((c) => `<td>${utils.escapeHTML(row[c] ?? row[c.toLowerCase()] ?? "")}</td>`).join("")}` +
-        `<td class="row-actions">${rowActions(row)}</td>`;
-      tbody.appendChild(tr);
-    });
-  }
-  return t;
-};
-
-export { app, $ };
+/* Export app and default */
+export { app };
 export default app;
 
 /* Kick off when DOM ready */
