@@ -158,6 +158,64 @@ The app degrades gracefully: if no `GOOGLE_CLIENT_ID` is configured,
 the sign-in button is hidden and the app shows an "Authentication required"
 message on every API call.
 
+## Public Website Integration
+
+The marketing website at `pablo-paraiso/` has a booking form that now
+submits directly to **this** management app's GAS backend, so every
+website booking appears instantly in the management dashboard, the
+**Bookings** table, the calendar, and the finances chart.
+
+### How it works
+
+| Public website form field | Management app destination |
+|---|---|
+| Name, Email, Phone | **Customers** sheet (find-or-create by email) |
+| Date + Time Slot + Package | **Bookings** sheet → `checkIn`/`checkOut`/`total` |
+| Event Type, Guests, Budget, Special Requests | Bookings extra columns (`eventType`, `guests`, `budget`, `specialRequests`) |
+| Calendar check | Same `getCalendar()` call — checks the **configured** calendar |
+| Calendar event | Created on the **configured** calendar with all form details |
+| Audit trail | `ActivityLog` + `WebBookings` sheets |
+
+The endpoint is **public** (no GIS token required) — it is the only
+`doPost` action that bypasses `requireAuth()`. Input validation, calendar
+availability checks, and logging are all enforced.
+
+### Setting a specific calendar (not your default)
+
+The backend now reads `CALENDAR_ID` from **Script Properties** instead of
+always using `CalendarApp.getDefaultCalendar()`. To use a different
+calendar:
+
+1. In the Apps Script editor → **Project Settings ⚙ → Script properties**.
+2. Add `CALENDAR_ID` = your calendar ID (Google Calendar → Settings →
+   select calendar → "Calendar ID", looks like `you@gmail.com` or
+   `abc123@group.calendar.google.com`).
+3. If unset or `"primary"`, falls back to `CalendarApp.getDefaultCalendar()`.
+
+> The calendar must be one the script-owner has **write** access to.
+> The backend creates events on this calendar for website bookings.
+
+### Updating the website's endpoint URL
+
+1. Deploy the backend as a **Web app** → *Execute as*: **Me** →
+   *Who has access*: **Anyone, even anonymous**.
+2. Copy the **Web app URL**.
+3. Paste into `Pablo Paraiso/index.html`:
+```js
+var GAS_ENDPOINT = "https://script.google.com/macros/s/YOUR-SCRIPT-ID/exec?action=submitPublicBooking";
+```
+
+### Testing the integration
+
+After deployment, fill out the booking form and check:
+
+- ✅ `ActivityLog` tab shows the request.
+- ✅ A `WebBookings` row appears with all form fields.
+- ✅ A `Bookings` row is created (dates, price, status `pending`).
+- ✅ If the email is new, a `Customers` row is created.
+- ✅ A calendar event appears on your configured calendar.
+- ✅ The management app's **Calendar** view shows the event.
+
 ## First-run seeding
 
 On the first run with **empty** Sheets, `app.maybeSeed()` auto-inserts demo
