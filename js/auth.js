@@ -155,17 +155,22 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
 
   if (!payload.success) {
     /* Apps Script ContentService always returns HTTP 200 — the real status
-       code is embedded in the JSON body (payload.status). Check both. */
+       code is embedded in the JSON body (payload.status). Check both the
+       status field AND the error message text, so this works with backends
+       that haven't been redeployed to include payload.status. */
     const statusCode = payload.status || resp.status;
+    const errMsg = payload.error || "";
+    const isAuthErr = statusCode === 401 || errMsg.includes("Authentication required") || errMsg.includes("Invalid token");
+    const isDeniedErr = statusCode === 403 || errMsg.includes("not authorized") || errMsg.includes("Access denied");
     /* 401 → backend not authenticated: tell the app to prompt sign-in */
-    if (statusCode === 401) {
-      document.dispatchEvent(new CustomEvent("auth:required", { detail: { message: payload.error } }));
+    if (isAuthErr) {
+      document.dispatchEvent(new CustomEvent("auth:required", { detail: { message: errMsg } }));
     }
     /* 403 → signed in but not on the allow-list */
-    if (statusCode === 403) {
-      document.dispatchEvent(new CustomEvent("auth:denied", { detail: { message: payload.error } }));
+    if (isDeniedErr) {
+      document.dispatchEvent(new CustomEvent("auth:denied", { detail: { message: errMsg } }));
     }
-    const err = new Error(payload.error || `Request failed (action=${action})`);
+    const err = new Error(errMsg || `Request failed (action=${action})`);
     err.status = statusCode;
     throw err;
   }
