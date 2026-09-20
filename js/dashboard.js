@@ -139,11 +139,11 @@ function renderCharts(finances, bookings, supplies, properties, customers) {
       },
       scales: {
         y: {
-          ticks: { color: "var(--color-text-muted)" },
+          ticks: { color: "var(--color-text-dim)" },
           grid: { color: "var(--color-border)" },
         },
         x: {
-          ticks: { color: "var(--color-text-muted)" },
+          ticks: { color: "var(--color-text-dim)" },
           grid: { display: false },
         },
       },
@@ -227,11 +227,11 @@ function renderCharts(finances, bookings, supplies, properties, customers) {
       },
       scales: {
         y: {
-          ticks: { color: "var(--color-text-muted)" },
+          ticks: { color: "var(--color-text-dim)" },
           grid: { color: "var(--color-border)" },
         },
         x: {
-          ticks: { color: "var(--color-text-muted)" },
+          ticks: { color: "var(--color-text-dim)" },
           grid: { display: false },
         },
       },
@@ -271,11 +271,11 @@ function renderCharts(finances, bookings, supplies, properties, customers) {
       },
       scales: {
         x: {
-          ticks: { color: "var(--color-text-muted)" },
+          ticks: { color: "var(--color-text-dim)" },
           grid: { color: "var(--color-border)" },
         },
         y: {
-          ticks: { color: "var(--color-text-muted)" },
+          ticks: { color: "var(--color-text-dim)" },
           grid: { display: false },
         },
       },
@@ -286,3 +286,37 @@ function renderCharts(finances, bookings, supplies, properties, customers) {
 export function refreshDashboard() {
   loadDashboard();
 }
+
+export function refreshCharts() {
+  Object.values(charts).forEach((c) => {
+    if (!c) return;
+    /* Rebuild options with fresh CSS variable colours so charts stay legible
+       after a theme switch without re-rendering data. */
+    const opts = c.options;
+    if (opts.scales) {
+      ["x", "y"].forEach((axis) => {
+        if (opts.scales[axis]) {
+          if (opts.scales[axis].ticks) opts.scales[axis].ticks.color = "var(--color-text-dim)";
+          if (opts.scales[axis].grid) {
+            opts.scales[axis].grid.color = axis === "x" ? "var(--color-border)" : "var(--color-border)";
+          }
+        }
+      });
+    }
+    if (opts.plugins && opts.plugins.tooltip) {
+      opts.plugins.tooltip.backgroundColor = "var(--color-surface-2)";
+      opts.plugins.tooltip.titleColor = "var(--color-text)";
+      opts.plugins.tooltip.bodyColor = "var(--color-text-dim)";
+      opts.plugins.tooltip.borderColor = "var(--color-border)";
+    }
+    if (opts.plugins && opts.plugins.legend && opts.plugins.legend.labels) {
+      opts.plugins.legend.labels.color = "var(--color-text-dim)";
+    }
+    c.update();
+  });
+}
+
+/* Listen for theme changes from the shell and refresh chart colours */
+document.addEventListener("themechange", () => {
+  if (Object.keys(charts).length) refreshCharts();
+});

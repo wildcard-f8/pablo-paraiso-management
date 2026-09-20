@@ -161,8 +161,8 @@ function renderChart() {
         },
       },
       scales: {
-        x: { stacked: true, ticks: { color: "var(--color-text-muted)" }, grid: { display: false } },
-        y: { stacked: true, ticks: { color: "var(--color-text-muted)" }, grid: { color: "var(--color-border)" } },
+        x: { stacked: true, ticks: { color: "var(--color-text-dim)" }, grid: { display: false } },
+        y: { stacked: true, ticks: { color: "var(--color-text-dim)" }, grid: { color: "var(--color-border)" } },
       },
     },
   });

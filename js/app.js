@@ -243,6 +243,7 @@ const app = {
     const isLight = document.documentElement.classList.contains("theme-light");
     localStorage.setItem("theme", isLight ? "light" : "dark");
     this.syncThemeToggle();
+    document.dispatchEvent(new CustomEvent("themechange", { detail: { isLight } }));
   },
 
   /* ── Modal API ── */
