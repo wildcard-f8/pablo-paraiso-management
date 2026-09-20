@@ -29,6 +29,10 @@
         <span class="auth-btn__signed-out">Sign in with Google</span>
         <span class="auth-btn__signed-in">Sign out</span>
       </button>
+      <div class="auth-gate__verifying" id="authVerifying" style="display:none;">
+        <span class="spinner"></span>
+        <p class="auth-gate__caption">Verifying your account &hellip;</p>
+      </div>
       <div class="auth-gate__denied" id="authDenied" style="display:none;">
         <p class="error">Your Google account is not authorized to access this application.</p>
         <p>Please contact the site owner to be added to the authorized users list.</p>

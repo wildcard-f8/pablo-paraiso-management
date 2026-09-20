@@ -65,6 +65,19 @@ const app = {
     const gate = $("#authGate");
     const gateBtn = $("#authGateBtn");
     const denied = $("#authDenied");
+    const verifying = $("#authVerifying");
+
+    /* Show / hide the "verifying" spinner on the gate */
+    const showVerifying = () => {
+      verifying.style.display = "flex";
+      gateBtn.style.display = "none";
+      denied.style.display = "none";
+    };
+    const hideVerifying = () => {
+      verifying.style.display = "none";
+      gateBtn.style.display = "";
+      denied.style.display = "none";
+    };
 
     /* Sync gate visibility based on stored token */
     const syncGate = () => {
@@ -89,35 +102,71 @@ const app = {
       else { auth.signIn(); }
     });
 
+    /*
+     * Called after GIS sign-in. Instead of immediately navigating to the
+     * dashboard, we verify the token against the backend. Only if the
+     * backend says the user is authorized do we hide the gate and render
+     * the dashboard. If unauthorized (403), the auth:denied handler
+     * shows the "access denied" message on the gate — the dashboard never
+     * renders. If the token is invalid (401), auth:required shows the
+     * sign-in screen again.
+     */
     document.addEventListener("auth:changed", (e) => {
       const authed = e.detail && e.detail.authed;
       btn.classList.toggle("signed-in", authed);
-      syncGate();
-      /* After sign-in, re-navigate to reload data with the new auth token */
-      if (authed && currentParams && ROUTES[currentParams.page]) {
-        app.navigate(currentParams.page, currentParams.args);
-      } else if (authed) {
-        /* First sign-in: navigate to dashboard from whatever hash was set */
-        app.navigate("dashboard", []);
+      if (authed) {
+        /* Show "verifying..." spinner while we test the token */
+        gate.classList.remove("auth-gate__hidden");
+        gate.classList.remove("app-authed");
+        showVerifying();
+
+        /* Probe the backend — a successful call proves the token is
+         * valid AND the user is on the allow-list. */
+        api.get("getCustomers")
+          .then(() => {
+            /* Token is valid and user is authorized — reveal the app */
+            hideVerifying();
+            syncGate();
+            /* Navigate to dashboard (or whatever hash was set) */
+            app.navigate(currentParams.page || "dashboard", currentParams.args);
+          })
+          .catch((err) => {
+            /* The auth:required / auth:denied handlers (below) have already
+             * run by now via the fetchGAS throw — they reset the gate to
+             * the sign-in or denied screen. Here we just make sure the
+             * verifying spinner is cleaned up. */
+            hideVerifying();
+          });
+      } else {
+        hideVerifying();
+        syncGate();
       }
     });
 
-    /* Backend returned 401 — prompt the user to sign in */
+    /* Backend returned 401 — token invalid/expired: sign out and prompt sign-in */
     document.addEventListener("auth:required", (e) => {
-      app.showToast(e.detail?.message || "Please sign in to view this page.", "error");
+      auth.signOut();  // clear stale token so the gate shows "Sign in"
+      app.showToast(e.detail?.message || "Please sign in to view this page.", "info");
       btn.classList.add("pulse");
       setTimeout(() => btn.classList.remove("pulse"), 6000);
+      hideVerifying();
       syncGate();
+      /* Clear any dashboard content that may have started rendering */
+      $("#pageSlot").innerHTML = "";
     });
 
-    /* Backend returned 403 — show access-denied on the gate */
+    /* Backend returned 403 — valid token but not on allow-list: sign out, show denied */
     document.addEventListener("auth:denied", (e) => {
+      auth.signOut();  // clear token so gate shows "Sign in" button, not "Sign out"
       app.showToast(e.detail?.message || "Access denied.", "error");
+      hideVerifying();
       denied.style.display = "block";
       gate.classList.remove("app-authed");
       gate.classList.remove("auth-gate__hidden");
       btn.classList.add("pulse");
       setTimeout(() => btn.classList.remove("pulse"), 6000);
+      /* Clear any dashboard content that may have started rendering */
+      $("#pageSlot").innerHTML = "";
     });
   },
 
