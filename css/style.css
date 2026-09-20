@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Retreat Management - Design Tokens
+   Pablo Paraiso Management - Design Tokens
    ========================================================================== */
 :root {
   /* ── Color palette ── */
@@ -211,6 +211,71 @@ ul, ol { list-style: none; margin: 0; padding: 0; }
   0% { transform: scale(1); }
   50% { transform: scale(1.05); box-shadow: 0 0 0 4px var(--color-primary); }
   100% { transform: scale(1); }
+}
+
+/* ── Auth gate overlay ── */
+.auth-gate {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: var(--color-bg);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  transition: opacity 0.3s ease;
+}
+.auth-gate__content {
+  text-align: center;
+  max-width: 380px;
+  padding: 2rem;
+}
+.auth-gate__logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+.auth-gate__logo .logo__icon {
+  width: 40px;
+  height: 40px;
+}
+.auth-gate__logo span {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+.auth-gate h2 {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.auth-gate__caption {
+  color: var(--color-text-muted);
+  margin-bottom: 1.5rem;
+}
+.auth-gate__denied {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+.auth-gate__denied .error {
+  color: #f87171;
+  font-size: 0.9rem;
+}
+.auth-gate__denied p {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+}
+.auth-gate.app-authed {
+  opacity: 0;
+  pointer-events: none;
+}
+.auth-gate__hidden {
+  display: none !important;
 }
 
 /* ── Workspace ── */

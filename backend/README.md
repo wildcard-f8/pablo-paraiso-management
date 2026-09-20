@@ -1,4 +1,4 @@
-# Retreat Management — Backend (Google Apps Script)
+# Pablo Paraiso Management — Backend (Google Apps Script)
 
 Zero-cost REST API backend using Google Apps Script that reads/writes Google
 Sheets and Google Calendar. Deployed as a web app with "Anyone, even anonymous"
@@ -22,7 +22,7 @@ access.
    dropdown at the top and click **▶ Run**.
 
    This will:
-   - Create a new Google Sheet named "Retreat Management — Database"
+   - Create a new Google Sheet named "Pablo Paraiso Management — Database"
    - Set the `SHEET_ID` script property automatically
    - Write headers and sample data to every tab (Finances, Customers,
      Bookings, Supplies, Properties, Config)
@@ -35,7 +35,7 @@ access.
 
    - Click the **Deploy** button (🚀 icon) → **New deployment**
    - Select **Web app**
-   - **Description:** `Retreat Management API`
+   - **Description:** `Pablo Paraiso Management API`
    - **Execute as:** `Me` (your account — required for CalendarApp access)
    - **Who has access:** `Anyone, even anonymous`
    - Click **Deploy**

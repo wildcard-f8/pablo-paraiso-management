@@ -11,7 +11,7 @@
 */
 import { CONFIG } from "./config.js";
 
-const TOKEN_KEY = "retreat_gis_token";
+const TOKEN_KEY = "paraiso_gis_token";
 
 let tokenClient = null;
 let gisInitialized = false;
@@ -146,6 +146,10 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
     /* 401 → backend not authenticated: tell the app to prompt sign-in */
     if (resp.status === 401) {
       document.dispatchEvent(new CustomEvent("auth:required", { detail: { message: payload.error } }));
+    }
+    /* 403 → signed in but not on the allow-list */
+    if (resp.status === 403) {
+      document.dispatchEvent(new CustomEvent("auth:denied", { detail: { message: payload.error } }));
     }
     const err = new Error(payload.error || `Request failed (action=${action})`);
     err.status = resp.status;               /* attach HTTP status for callers */

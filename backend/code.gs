@@ -1,8 +1,8 @@
 /**
  * ============================================================================
- * Retreat Management - Google Apps Script Backend (code.gs)
+ * Pablo Paraiso Management - Google Apps Script Backend (code.gs)
  * ============================================================================
- * REST API for retreat property rental management webapp.
+ * REST API for property rental management webapp.
  * Reads/writes Google Sheets and Google Calendar. Zero cost (Apps Script).
  *
  * Deploy as Web App:
@@ -825,7 +825,7 @@ function seedDatabase() {
   var isNew = false;
 
   if (!sheetId) {
-    spreadsheet = SpreadsheetApp.create('Retreat Management — Database');
+    spreadsheet = SpreadsheetApp.create('Pablo Paraiso Management — Database');
     scriptProperties.setProperty('SHEET_ID', spreadsheet.getId());
     sheetId = spreadsheet.getId();
     isNew = true;

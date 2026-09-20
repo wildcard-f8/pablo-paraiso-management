@@ -1,4 +1,4 @@
-# Retreat Management App
+# Pablo Paraiso Management App
 
 A zero-cost, single-page property-rental management app for retreat hosts.
 Frontend is a static HTML/CSS/ES-module site hosted on **GitHub Pages**;
@@ -51,7 +51,9 @@ The backend code lives in `backend/code.gs`. Follow these steps:
    `action` query/body parameter (e.g. `?action=getFinances`).
 4. Add the headers below and return JSON `{success, data|error}`.
 5. Deploy → **New deployment** → **Web app** →
-   *Execute as*: Me · *Who has access*: Anyone (or "Anyone with Google account").
+   *Execute as*: Me · *Who has access*: Anyone, even anonymous.
+   *(Access control is enforced in code via `requireAuth()` — see
+   "Managing authorized users" below.)*
 6. Copy the **Web app URL** into `js/config.js` as `API_BASE_URL`
    (replace `[SCRIPT_ID]`).
 
@@ -146,17 +148,15 @@ getAuthorizedUsers()  // prints to Logs (View → Logs)
 
 ### Backend token validation (optional)
 
-By default the backend (`code.gs`) is deployed as **"Anyone, even anonymous"**.
-The `Authorization` header is forwarded but not validated. For user-level
-access control:
+By default the backend (`code.gs`) is deployed as **"Anyone, even anonymous"**. The
+`Authorization` header is forwarded and **validated in code** via
+`requireAuth()` — the frontend GIS token is verified against Google's
+tokeninfo endpoint and the user's email is checked against an allow-list.
+For user-level access control see **Managing authorized users** above.
 
-1. In Apps Script, change `Session.getEffectiveUser()` checks or inspect
-   `e.parameter` for the Bearer token.
-2. Change the web-app **Who has access** to **"Anyone with Google account"**.
-3. Users must sign in before they can call the API.
-
-The app degrades gracefully: if `GOOGLE_CLIENT_ID` is still `[GOOGLE_CLIENT_ID]`
-(or empty), GIS is skipped and the app works against an anonymous backend.
+The app degrades gracefully: if no `GOOGLE_CLIENT_ID` is configured,
+the sign-in button is hidden and the app shows an "Authentication required"
+message on every API call.
 
 ## First-run seeding
 

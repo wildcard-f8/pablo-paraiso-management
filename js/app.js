@@ -36,8 +36,11 @@ const app = {
     window.addEventListener("hashchange", () => this.parseHash());
     window.addEventListener("load", () => {
       isFirstLoad = false;
-      this.showToast(`Welcome to ${CONFIG.APP_NAME}`, "info");
-      this.maybeSeed();
+      /* Only welcome + seed when the user is authenticated */
+      if (auth.isAuthed()) {
+        this.showToast(`Welcome to ${CONFIG.APP_NAME}`, "info");
+        this.maybeSeed();
+      }
     });
   },
 
@@ -59,7 +62,29 @@ const app = {
   bindAuth() {
     auth.init();
     const btn = $("#authBtn");
+    const gate = $("#authGate");
+    const gateBtn = $("#authGateBtn");
+    const denied = $("#authDenied");
+
+    /* Sync gate visibility based on stored token */
+    const syncGate = () => {
+      const authed = auth.isAuthed();
+      gate.classList.toggle("app-authed", authed);
+      // After the fade-out transition, remove pointer-events
+      if (authed) {
+        setTimeout(() => gate.classList.add("auth-gate__hidden"), 300);
+      } else {
+        gate.classList.remove("auth-gate__hidden");
+        denied.style.display = "none";
+      }
+    };
+    syncGate();
+
     btn.addEventListener("click", () => {
+      if (auth.isAuthed()) { auth.signOut(); }
+      else { auth.signIn(); }
+    });
+    gateBtn.addEventListener("click", () => {
       if (auth.isAuthed()) { auth.signOut(); }
       else { auth.signIn(); }
     });
@@ -67,16 +92,30 @@ const app = {
     document.addEventListener("auth:changed", (e) => {
       const authed = e.detail && e.detail.authed;
       btn.classList.toggle("signed-in", authed);
+      syncGate();
       /* After sign-in, re-navigate to reload data with the new auth token */
       if (authed && currentParams && ROUTES[currentParams.page]) {
         app.navigate(currentParams.page, currentParams.args);
+      } else if (authed) {
+        /* First sign-in: navigate to dashboard from whatever hash was set */
+        app.navigate("dashboard", []);
       }
     });
 
     /* Backend returned 401 — prompt the user to sign in */
     document.addEventListener("auth:required", (e) => {
-      const msg = (e.detail && e.detail.message) || "Please sign in to view this page.";
-      app.showToast(msg, "error");
+      app.showToast(e.detail?.message || "Please sign in to view this page.", "error");
+      btn.classList.add("pulse");
+      setTimeout(() => btn.classList.remove("pulse"), 6000);
+      syncGate();
+    });
+
+    /* Backend returned 403 — show access-denied on the gate */
+    document.addEventListener("auth:denied", (e) => {
+      app.showToast(e.detail?.message || "Access denied.", "error");
+      denied.style.display = "block";
+      gate.classList.remove("app-authed");
+      gate.classList.remove("auth-gate__hidden");
       btn.classList.add("pulse");
       setTimeout(() => btn.classList.remove("pulse"), 6000);
     });
@@ -279,7 +318,7 @@ const app = {
         this.showToast("Demo data seeded for first-run experience.", "info", 5000);
       }
     } catch (e) {
-      // Backend likely not configured yet; stay silent in UI but log.
+    /* Backend not reachable or not authorized; stay silent in UI but log. */
       console.warn("Seeding check skipped:", e.message);
     }
   },
@@ -327,7 +366,7 @@ function createAbout() {
   const el = document.createElement("section");
   el.className = "card";
   el.innerHTML = `
-    <h1>About Retreat Management</h1>
+    <h1>About Pablo Paraiso Management</h1>
     <p>A zero-cost property rental management app for retreat hosts. Frontend
        lives on GitHub Pages; backend is a Google Apps Script web app backed by
        Google Sheets and Google Calendar.</p>

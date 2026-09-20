@@ -1,4 +1,4 @@
-# Retreat Management App - Specification
+# Pablo Paraiso Management App - Specification
 
 ## Architecture
 

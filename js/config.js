@@ -1,4 +1,4 @@
-/* Retreat Management App - Config
+/* Pablo Paraiso Management App - Config
    Central configuration for API endpoint and Google Identity Services.
    Replace placeholders before deploying.
 */
@@ -13,7 +13,7 @@ export const CONFIG = {
   GOOGLE_CLIENT_ID: "106840707748-shd83c7efjufadl2eq3sdgk5grcrplk7.apps.googleusercontent.com",
 
   // Optional application title shown in the browser tab / header.
-  APP_NAME: "Retreat Management",
+  APP_NAME: "Pablo Paraiso Management",
 
   // How many records to fetch for the "infinite" table view before requesting more.
   PAGE_SIZE: 100,
