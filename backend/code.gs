@@ -160,8 +160,12 @@ function generateId(tabName, prefix) {
  */
 function sendJson(obj, status) {
   status = status || 200;
-  var output = ContentService.createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
+  // NOTE: do NOT chain .setMimeType() on createTextOutput() — in some Apps
+  // Script runtimes setMimeType() returns a value other than the TextOutput,
+  // causing subsequent output.setHeader() to throw "not a function".
+  // Call them separately so `output` is always the TextOutput instance.
+  var output = ContentService.createTextOutput(JSON.stringify(obj));
+  output.setMimeType(ContentService.MimeType.JSON);
   output.setHeader('Access-Control-Allow-Origin', '*');
   output.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   output.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
