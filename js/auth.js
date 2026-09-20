@@ -118,12 +118,23 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
     });
   }
 
-  const headers = { "Content-Type": "application/json" };
+  /*
+   * Token is sent as a _token query param (not the Authorization header) so
+   * that the request stays a CORS "simple request" (no custom headers) and
+   * the browser does NOT send a preflight OPTIONS. Google Apps Script's
+   * web-app proxy does not return CORS headers on OPTIONS, which causes the
+   * preflight to fail with "Failed to fetch". Simple requests (GET with no
+   * custom headers, or POST with Content-Type: text/plain) go straight
+   * through and inherit access-control-allow-origin from Google's redirect.
+   */
   const token = auth.getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
+  if (token) url.searchParams.set("_token", token);
 
-  const opts = { method, headers };
+  // Simple-request headers only — Content-Type: text/plain is a "simple"
+  // Content-Type that does not trigger CORS preflight.
+  const opts = { method };
   if (body !== null && method !== "GET") {
+    opts.headers = { "Content-Type": "text/plain" };
     opts.body = JSON.stringify(body);
   }
 
