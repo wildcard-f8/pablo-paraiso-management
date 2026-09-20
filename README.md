@@ -8,7 +8,7 @@ backend is a **Google Apps Script** web app backed by **Google Sheets** and
 ## Project structure
 
 ```
-retreat-management/
+pablo-paraiso-management/
 ├── SPEC.md              # API contract & data model (source of truth)
 ├── index.html           # App shell: top bar, sidebar, page slot, modal, toasts
 ├── css/style.css        # Design tokens, responsive layout, dark/light theme
@@ -92,7 +92,7 @@ The app supports **optional** Google sign-in. The auth button (`#authBtn` in
    ```
 4. Under **Authorized redirect URIs**, add:
    ```
-   https://wildcard-f8.github.io/retreat-management/
+   https://wildcard-f8.github.io/pablo-paraiso-management/
    ```
    *(Not strictly required for GIS — GIS uses a pop-up, not redirects —
    but it does not hurt to include it.)*
