@@ -37,17 +37,12 @@ access.
    - Select **Web app**
    - **Description:** `Pablo Paraiso Management API`
    - **Execute as:** `Me` (your account — required for CalendarApp access)
-   - **Who has access:** `Anyone, even anonymous`
+   - **Who has access:** `Anyone, even anonymous` ← auth is enforced in code via `requireAuth()`
    - Click **Deploy**
-   - Copy the **Web app URL** — it looks like:
-     `https://script.google.com/macros/s/[SCRIPT_ID]/dev`
+   - Copy the **Web app URL** (`https://script.google.com/macros/s/[SCRIPT_ID]/exec`)
+   - Paste it in `js/config.js` → `API_BASE_URL`
 
-5. **Configure the frontend**
-
-   In your frontend `config.js`:
-   ```js
-   const API_BASE_URL = 'https://script.google.com/macros/s/[SCRIPT_ID]/dev';
-   ```
+   ⚠️ **Important:** After pasting `code.gs`, always click **Deploy** (create a new version) so the `/exec` URL runs the latest code. Editing code without deploying will not update the live endpoint.
 
 ## API Reference
 
@@ -73,7 +68,7 @@ Every request returns JSON with the same envelope:
 
 **Example:**
 ```
-GET https://script.google.com/macros/s/[SCRIPT_ID]/dev?action=getFinances
+GET https://script.google.com/macros/s/[SCRIPT_ID]/exec?action=getFinances
 ```
 
 ### POST Endpoints (JSON body)
@@ -190,6 +185,8 @@ Access-Control-Max-Age: 3600
 
 The backend also handles `OPTIONS` preflight requests via `doOptions(e)`.
 
+⚠️ **CORS troubleshooting:** If the frontend reports "Network error: Failed to fetch", check the `/exec` URL in a browser — if you see an HTML error page instead of JSON, the web app was not properly deployed or the code has a runtime error. Ensure you clicked **Deploy** (not just **Save**) in the Apps Script editor, and that the `sendJson` function calls `createTextOutput()` and `setMimeType()` separately (not chained).
+
 ## Configuration
 
 | Property     | Where                          | Description                          |
@@ -209,5 +206,5 @@ sample data. This is safe to re-run; it clears and re-populates all tabs.
 
 ```
 Script ID (for frontend):  https://script.google.com/home/projects/[SCRIPT_ID]
-Deploy as web app:         https://script.google.com/macros/s/[SCRIPT_ID]/dev
+Deploy as web app:         https://script.google.com/macros/s/[SCRIPT_ID]/exec
 ```
