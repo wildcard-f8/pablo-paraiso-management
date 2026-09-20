@@ -74,7 +74,8 @@ GET https://script.google.com/macros/s/[SCRIPT_ID]/exec?action=getFinances
 ### POST Endpoints (JSON body)
 
 All POST requests send `?action=<action>` as a query parameter and the payload
-as a JSON body with `Content-Type: application/json`.
+as a JSON body. The frontend sends `Content-Type: text/plain` (not `application/json`)
+to keep the request a CORS "simple request" — see the [CORS section](#cors) below.
 
 | Action                | Body Fields                                                        |
 |-----------------------|--------------------------------------------------------------------|
@@ -96,10 +97,10 @@ as a JSON body with `Content-Type: application/json`.
 
 **Example (create a finance record):**
 ```js
-fetch(API_BASE_URL + '?action=addFinance', {
+fetch(API_BASE_URL + '?action=addFinance&_token=GIS_ACCESS_TOKEN', {
   method: 'POST',
   mode: 'cors',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'text/plain' },  // text/plain = simple request, no preflight
   body: JSON.stringify({
     date: '2024-02-01',
     type: 'income',
@@ -118,7 +119,7 @@ Finance      { id:"F0001", date:"2024-01-15", type:"income", category:"Booking",
                description:"Payment B0001", amount:15000, bookingId:"B0001" }
 
 Customer     { id:"C0001", name:"John Smith", email:"john@example.com",
-               phone:"+1234567890", address:"123 Main St", notes:"VIP" }
+               phone:"+123****7890", address:"123 Main St", notes:"VIP" }
 
 Booking      { id:"B0001", customerId:"C0001", property:"Lakeside Villa",
                checkIn:"2024-01-20", checkOut:"2024-01-25", nights:5,
@@ -171,10 +172,21 @@ The backend uses the script owner's **primary calendar** (`CalendarApp.getDefaul
 - `getCalendarEvents` reads events within the `start`–`end` window.
 - All calendar operations (`add`, `update`, `delete`) use the primary calendar.
 
-## CORS
+## CORS — Simple Request Mode
 
-The following headers are set on every response so the GitHub Pages frontend
-can call the API directly:
+To avoid CORS preflight failures, the frontend sends all API requests as
+**CORS "simple requests"** — no custom request headers that would trigger
+an `OPTIONS` preflight:
+
+- **GET requests:** No `Content-Type` header, no `Authorization` header.
+  The GIS access token is passed as a `_token` **query parameter**.
+- **POST/DELETE requests:** `Content-Type: text/plain` (a "simple" Content-Type
+  that does not trigger preflight). Token is also passed as `_token` query param.
+
+The backend `requireAuth(e)` checks `e.parameter._token` first, then falls
+back to the `Authorization: Bearer` header for manual/curl testing.
+
+The `sendJson` helper attempts to set CORS headers on every response:
 
 ```
 Access-Control-Allow-Origin: *
@@ -185,7 +197,18 @@ Access-Control-Max-Age: 3600
 
 The backend also handles `OPTIONS` preflight requests via `doOptions(e)`.
 
-⚠️ **CORS troubleshooting:** If the frontend reports "Network error: Failed to fetch", check the `/exec` URL in a browser — if you see an HTML error page instead of JSON, the web app was not properly deployed or the code has a runtime error. Ensure you clicked **Deploy** (not just **Save**) in the Apps Script editor, and that the `sendJson` function calls `createTextOutput()` and `setMimeType()` separately (not chained).
+⚠️ **CORS troubleshooting:** If the frontend reports "Network error: Failed to fetch":
+
+1. **Re-deploy after every code change.** Editing code in the Apps Script editor
+   does NOT update the `/exec` URL. Click **Deploy → New deployment → Web app**
+   after pasting new code, and copy the new URL.
+2. Test manually in a browser: paste the `/exec?action=getFinances` URL
+   (no token) — it should return JSON like `{"success": false, "error": "Authentication required..."}`.
+   If you see an HTML error page, **you must redeploy.**
+3. The browser DevTools Network tab should show the GET request going directly
+   (without a preceding OPTIONS preflight). If you see an OPTIONS request
+   returning empty `text/html`, the old frontend code is cached — do a hard
+   refresh (Ctrl+F5) or clear browser cache.
 
 ## Configuration
 
