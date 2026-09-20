@@ -160,16 +160,27 @@ function generateId(tabName, prefix) {
  */
 function sendJson(obj, status) {
   status = status || 200;
-  // NOTE: do NOT chain .setMimeType() on createTextOutput() — in some Apps
-  // Script runtimes setMimeType() returns a value other than the TextOutput,
-  // causing subsequent output.setHeader() to throw "not a function".
-  // Call them separately so `output` is always the TextOutput instance.
   var output = ContentService.createTextOutput(JSON.stringify(obj));
-  output.setMimeType(ContentService.MimeType.JSON);
-  output.setHeader('Access-Control-Allow-Origin', '*');
-  output.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  output.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  output.setHeader('Access-Control-Max-Age', '3600');
+  // Set MIME type — try JSON first, fall back to TEXT
+  try {
+    output.setMimeType(ContentService.MimeType.JSON);
+  } catch (e) {
+    try { output.setMimeType(ContentService.MimeType.TEXT); } catch (e2) { /* ignore */ }
+  }
+  // Set CORS headers — wrap each in try-catch because some Apps Script
+  // runtimes do not expose setHeader on TextOutput.
+  // https://developers.google.com/apps-script/reference/content/text-output
+  // reports setHeader as available, but if the runtime returns a different
+  // type from createTextOutput(), this will silently skip.
+  var corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '3600'
+  };
+  for (var key in corsHeaders) {
+    try { output.setHeader(key, corsHeaders[key]); } catch (e) { /* skip */ }
+  }
   return output;
 }
 
@@ -553,6 +564,22 @@ function doPost(e) {
  */
 function doOptions(e) {
   return sendSuccess(null);
+}
+
+/**
+ * Diagnostic: logs what methods are available on the TextOutput object.
+ * Run this from the Apps Script editor (▶ Run) if setHeader fails.
+ */
+function debugTextOutput() {
+  var output = ContentService.createTextOutput('test');
+  Logger.log('typeof output: ' + typeof output);
+  Logger.log('output.constructor.name: ' + (output.constructor ? output.constructor.name : 'none'));
+  Logger.log('typeof output.setHeader: ' + typeof output.setHeader);
+  Logger.log('typeof output.setMimeType: ' + typeof output.setMimeType);
+  Logger.log('typeof output.setContent: ' + typeof output.setContent);
+  Logger.log('ContentService available: ' + (typeof ContentService !== 'undefined'));
+  Logger.log('MimeType.JSON: ' + ContentService.MimeType.JSON);
+  return output;
 }
 
 
