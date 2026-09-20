@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Retreat Management</title>
+  <link rel="icon" href="data:,">
+  <!-- Google Identity Services (loaded async in auth.js) -->
+  <!-- Chart.js v4 (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- FullCalendar v6 (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+  <link rel="stylesheet" href="css/style.css" />
+  <!-- NOTE: this project is an ES module app; scripts use import maps / type=module -->
+</head>
+<body>
+  <!-- Skip link for keyboard users -->
+  <a href="#main" class="skip-link">Skip to main content</a>
+
+  <!-- ── App shell ── -->
+  <div class="app-shell">
+    <!-- Top app bar -->
+    <header class="top-bar" id="topBar">
+      <div class="top-bar__left">
+        <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+          <span class="menu-btn__bar"></span>
+          <span class="menu-btn__bar"></span>
+          <span class="menu-btn__bar"></span>
+        </button>
+        <h1 class="logo">
+          <img class="logo__icon" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%233b82f6' d='M12 3 5 9v12h5v-6h4v6h5V9l-7-6z'/%3E%3C/svg%3E" alt="">
+          <span>Retreat</span>
+        </h1>
+      </div>
+      <div class="top-bar__right">
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark / light mode" title="Toggle theme">
+          <span class="theme-toggle__sun" aria-hidden="true">☀︎</span>
+          <span class="theme-toggle__moon" aria-hidden="true">🌙</span>
+        </button>
+        <button class="auth-btn" id="authBtn" title="Sign in with Google">
+          <span class="auth-btn__signed-out">Sign in</span>
+          <span class="auth-btn__signed-in">Sign out</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main layout -->
+    <div class="workspace">
+      <!-- Sidebar navigation -->
+      <nav class="sidebar" id="sidebar" aria-label="Main navigation">
+        <ul class="nav-list">
+          <li class="nav-item"><a href="#/dashboard" class="nav-link active" data-page="dashboard"><span class="nav-link__icon">📊</span>Dashboard</a></li>
+          <li class="nav-item"><a href="#/bookings" class="nav-link" data-page="bookings"><span class="nav-link__icon">📅</span>Bookings</a></li>
+          <li class="nav-item"><a href="#/calendar" class="nav-link" data-page="calendar"><span class="nav-link__icon">🗓</span>Calendar</a></li>
+          <li class="nav-item"><a href="#/customers" class="nav-link" data-page="customers"><span class="nav-link__icon">👥</span>Customers</a></li>
+          <li class="nav-item"><a href="#/finances" class="nav-link" data-page="finances"><span class="nav-link__icon">💰</span>Finances</a></li>
+          <li class="nav-item"><a href="#/supplies" class="nav-link" data-page="supplies"><span class="nav-link__icon">🏠</span>Supplies</a></li>
+          <li class="nav-divider" role="separator"></li>
+          <li class="nav-item"><a href="#/about" class="nav-link" data-page="about"><span class="nav-link__icon">?</span>About</a></li>
+        </ul>
+      </nav>
+
+      <!-- Page content -->
+      <main class="page" id="main">
+        <div class="page__slot" id="pageSlot">
+          <!-- Router injects page markup here -->
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Toast container (for transient messages) -->
+  <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Modal container (single shared modal for add/edit forms) -->
+  <div class="modal-overlay" id="modalOverlay" role="dialog" aria-hidden="true" aria-labelledby="modalTitle">
+    <div class="modal" id="modal">
+      <div class="modal__header">
+        <h2 class="modal__title" id="modalTitle"></h2>
+        <button class="modal__close" id="modalClose" aria-label="Close">&times;</button>
+      </div>
+      <form class="modal__form" id="modalForm">
+        <div class="modal__body" id="modalBody"></div>
+        <div class="modal__footer">
+          <button type="button" class="btn btn--ghost" id="modalCancel">Cancel</button>
+          <button type="submit" class="btn btn--primary" id="modalSubmit"></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
