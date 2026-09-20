@@ -21,21 +21,28 @@
 var HEADERS = {
   Finances:    ['id', 'date', 'type', 'category', 'description', 'amount', 'bookingId'],
   Customers:   ['id', 'name', 'email', 'phone', 'address', 'notes'],
-  Bookings:    ['id', 'customerId', 'property', 'checkIn', 'checkOut', 'nights', 'total', 'status', 'createdAt'],
+  Bookings:    ['id', 'customerId', 'property', 'checkIn', 'checkOut', 'nights', 'total', 'status', 'createdAt', 'eventType', 'guests', 'budget', 'specialRequests'],
   Supplies:    ['id', 'name', 'category', 'quantity', 'unit', 'unitCost', 'lastOrdered', 'supplier', 'minStock'],
   Properties:  ['id', 'name', 'address', 'capacity', 'dailyRate'],
-  Config:      ['key', 'value']
+  Config:      ['key', 'value'],
+  WebBookings: ['id', 'timestamp', 'name', 'email', 'phone', 'eventType', 'date', 'timeSlot', 'guests', 'package', 'budget', 'duration', 'calendarEventId', 'specialRequests', 'status', 'details']
 };
 
 // Fields that should be converted to numbers when reading/writing
 var NUMERIC_FIELDS = {
   Finances:   ['amount'],
   Customers:  [],
-  Bookings:   ['nights', 'total'],
+  Bookings:   ['nights', 'total', 'guests'],
   Supplies:   ['quantity', 'unitCost', 'minStock'],
   Properties: ['capacity', 'dailyRate'],
-  Config:     []
+  Config:     [],
+  WebBookings: ['guests', 'duration']
 };
+
+// ActivityLog sheet columns
+var LOG_COLUMNS = [
+  'Timestamp', 'Action', 'Status', 'Request Data (JSON)', 'Details', 'Client IP'
+];
 
 // ID prefix mapping for auto-generation (e.g. F0001, C0001, B0001, S0001, P0001)
 var ID_PREFIXES = {
@@ -43,7 +50,8 @@ var ID_PREFIXES = {
   Customers:  'C',
   Bookings:   'B',
   Supplies:   'S',
-  Properties: 'P'
+  Properties: 'P',
+  WebBookings: 'WB'
 };
 
 // Sheet name mapping (singular form of tab for error messages)
@@ -52,7 +60,8 @@ var SINGULAR = {
   Customers:  'Customer',
   Bookings:   'Booking',
   Supplies:   'Supply',
-  Properties: 'Property'
+  Properties: 'Property',
+  WebBookings: 'Web Booking'
 };
 
 
@@ -71,6 +80,35 @@ function getSpreadsheet() {
     throw new Error('SHEET_ID script property is not set. Run seedDatabase() or set it manually.');
   }
   return SpreadsheetApp.openById(sheetId);
+}
+
+/**
+ * Reads the configured Google Calendar ID from script properties.
+ * Set CALENDAR_ID in Project Settings → Script Properties.
+ * Use 'primary' for the script owner's default calendar.
+ * @return {string} Calendar ID (e.g. 'primary' or 'c_12345@group.calendar.google.com')
+ */
+function getCalendarId() {
+  var id = PropertiesService.getScriptProperties().getProperty('CALENDAR_ID') || 'primary';
+  return id;
+}
+
+/**
+ * Returns the Google Calendar object for the configured calendar ID.
+ * Uses CalendarApp.getCalendarById() for named calendars, falls back to
+ * CalendarApp.getDefaultCalendar() when CALENDAR_ID is 'primary' or unset.
+ * @return {GoogleAppsScript.Calendar.Calendar}
+ */
+function getCalendar() {
+  var id = getCalendarId();
+  if (id === 'primary' || !id) {
+    return CalendarApp.getDefaultCalendar();
+  }
+  var cal = CalendarApp.getCalendarById(id);
+  if (!cal) {
+    throw new Error('Calendar not found: ' + id + '. Ensure CALENDAR_ID is set correctly in Script Properties and you have access to this calendar.');
+  }
+  return cal;
 }
 
 /**
@@ -530,15 +568,24 @@ function doGet(e) {
  * ========================================================================== */
 
 function doPost(e) {
-  /* Require valid GIS token + allow-list check */
-  var _ga = requireAuth(e);
-  if (!_ga.valid) {
-    return sendError(_ga.error, _ga.status);
-  }
   try {
     var action = e.parameter.action;
     if (!action) {
       return sendError('Missing "action" parameter');
+    }
+
+    /* ─── Public endpoint: website booking submissions ───
+       No auth required — the public website posts here directly.
+       The data is validated and written to both the Bookings and
+       WebBookings sheets, plus a calendar event is created. */
+    if (action === 'submitPublicBooking') {
+      return submitPublicBooking(e);
+    }
+
+    /* Require valid GIS token + allow-list check for all other actions */
+    var _ga = requireAuth(e);
+    if (!_ga.valid) {
+      return sendError(_ga.error, _ga.status);
     }
 
     // Parse JSON body
@@ -607,6 +654,361 @@ function debugTextOutput() {
   return output;
 }
 
+/* ==========================================================================
+ * PUBLIC BOOKING ENDPOINT
+ * Accepts booking form submissions from the public website
+ * (https://wildcard-f8.github.io/pablo-paraiso/).
+ * No auth required — the action bypasses requireAuth() in doPost().
+ * Writes to the SAME Google Sheet + CALENDAR_ID as the management app.
+ * ========================================================================== */
+
+var PACKAGE_PRICES = {
+  "6-Hour Package": 4000,
+  "10-Hour Package": 6000,
+  "Custom Event": 0
+};
+
+var PACKAGE_DURATIONS_HOURS = {
+  "6-Hour Package": 6,
+  "10-Hour Package": 10,
+  "Custom Event": 6
+};
+
+var PUBLIC_TIME_SLOTS = ["09:00", "13:00", "14:00", "17:00"];
+
+/**
+ * Public endpoint — receives booking form submissions from the website.
+ * Writes to the Bookings + WebBookings sheets and creates a calendar event
+ * on the configured CALENDAR_ID (NOT the default calendar).
+ * @param {Object} e — the doPost event parameter
+ * @return {ContentOutput}
+ */
+function submitPublicBooking(e) {
+  var clientIP = (e.parameter && e.parameter.ip) || "website";
+
+  // Parse JSON body (sent as text/plain to avoid CORS preflight)
+  var data;
+  if (e.postData && e.postData.contents) {
+    try {
+      data = JSON.parse(e.postData.contents);
+    } catch (jsonErr) {
+      return sendJson({ success: false, message: "Invalid request format." }, 400);
+    }
+  } else {
+    return sendJson({ success: false, message: "Request body is required." }, 400);
+  }
+
+  try {
+    logPublicActivity("booking_request", "attempt", data, "Website booking submitted", clientIP);
+
+    /* ─── Validation ─── */
+    var validation = validatePublicBooking(data);
+    if (!validation.isValid) {
+      logPublicActivity("booking_request", "failed", data, "Validation: " + validation.error, clientIP);
+      return sendJson({ success: false, message: validation.error }, 400);
+    }
+
+    /* ─── Calendar availability ─── */
+    var duration = PACKAGE_DURATIONS_HOURS[data.package] || 6;
+    var availability = checkCalendarAvailability(data.date, data.timeSlot, duration);
+    if (!availability.available) {
+      var msg = "That time slot is already booked. Please select a different date and/or time.";
+      if (availability.suggestion) msg += " Suggestion: " + availability.suggestion;
+      logPublicActivity("availability_check", "failed", data, "Slot not available: " + availability.reason, clientIP);
+      return sendJson({ success: false, message: msg }, 409);
+    }
+
+    var startDateTime = parseDateTime(data.date, data.timeSlot);
+    var endDateTime = new Date(startDateTime.getTime() + duration * 60 * 60 * 1000);
+    var now = new Date();
+
+    /* ─── Find or create customer ─── */
+    var customer = findOrCreateCustomer(data.name, data.email, data.phone);
+
+    /* ─── Create booking record (management app schema) ─── */
+    var price = PACKAGE_PRICES[data.package] || 0;
+    var bookingData = {
+      customerId: customer.id,
+      property: "Pablo Paraiso Pool House",
+      checkIn: formatDate(startDateTime),
+      checkOut: formatDate(endDateTime),
+      nights: 0,
+      total: price,
+      status: "pending",
+      createdAt: formatDate(now),
+      eventType: data.eventType || "",
+      guests: parseInt(data.guests, 10) || 0,
+      budget: data.budget || "",
+      specialRequests: data.message || ""
+    };
+    var booking = addBooking(bookingData);
+
+    /* ─── Create calendar event on the configured calendar ─── */
+    var calendarEventId = null;
+    try {
+      var title = data.package + " — " + data.name + " (" + data.guests + " guests)";
+      var description = "Website Booking\n" +
+        "Booking ID: " + booking.id + "\n" +
+        "Name: " + data.name + "\n" +
+        "Email: " + data.email + "\n" +
+        "Phone: " + data.phone + "\n" +
+        "Event Type: " + data.eventType + "\n" +
+        "Date: " + data.date + "\n" +
+        "Time: " + timeSlotLabel(data.timeSlot) + "\n" +
+        "Package: " + data.package + "\n" +
+        "Guests: " + data.guests + "\n" +
+        "Budget: " + (data.budget || "Not specified") + "\n" +
+        (data.message ? "Special Requests: " + data.message + "\n" : "");
+      var calendar = getCalendar();
+      var event = calendar.createEvent(title, startDateTime, endDateTime, {
+        description: description,
+        guests: data.email
+      });
+      calendarEventId = event.getId();
+    } catch (calErr) {
+      /* Calendar event failed but booking was created — log and continue */
+      logPublicActivity("calendar_create", "error", data, calErr.toString(), clientIP);
+    }
+
+    /* ─── Also write to WebBookings sheet (audit trail for website submissions) ─── */
+    writeWebBookingRow(data, booking.id, calendarEventId, now, clientIP);
+
+    logPublicActivity("booking_request", "success", data,
+      "Booking confirmed. BID: " + booking.id + ", EID: " + calendarEventId, clientIP);
+
+    return sendJson({
+      success: true,
+      message: "Your booking has been confirmed! We will contact you within 2 hours to finalize the details.",
+      bookingId: booking.id,
+      eventId: calendarEventId
+    });
+
+  } catch (error) {
+    logPublicActivity("booking_request", "error", data || null,
+      "Unhandled error: " + error.toString(), clientIP);
+    return sendJson({
+      success: false,
+      message: "An unexpected error occurred. Please try again or contact us at hello@pabloparaiso.ph."
+    }, 500);
+  }
+}
+
+/**
+ * Validates booking form data from the public website.
+ * @param {Object} data
+ * @return {{isValid: boolean, error?: string}}
+ */
+function validatePublicBooking(data) {
+  if (!data || typeof data !== "object") {
+    return { isValid: false, error: "No data received." };
+  }
+  var required = ["name", "email", "phone", "date", "timeSlot", "guests", "package"];
+  for (var i = 0; i < required.length; i++) {
+    var field = required[i];
+    if (!data[field] || data[field].toString().trim() === "") {
+      return { isValid: false, error: "Please fill in all required fields (marked with *)." };
+    }
+  }
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(data.email)) {
+    return { isValid: false, error: "Please enter a valid email address." };
+  }
+  var inputDate = new Date(data.date);
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (inputDate < today) {
+    return { isValid: false, error: "The selected date must be today or in the future." };
+  }
+  var guests = parseInt(data.guests, 10);
+  if (guests < 1 || guests > 30) {
+    return { isValid: false, error: "Number of guests must be between 1 and 30." };
+  }
+  if (PUBLIC_TIME_SLOTS.indexOf(data.timeSlot) === -1) {
+    return { isValid: false, error: "Please select a valid time slot." };
+  }
+  if (!PACKAGE_PRICES.hasOwnProperty(data.package)) {
+    return { isValid: false, error: "Please select a valid package." };
+  }
+  return { isValid: true };
+}
+
+/**
+ * Parses a date string (YYYY-MM-DD) and a time string (HH:MM) into a Date.
+ * @param {string} dateStr
+ * @param {string} timeStr
+ * @return {Date}
+ */
+function parseDateTime(dateStr, timeStr) {
+  var date = new Date(dateStr);
+  var parts = timeStr.split(":");
+  date.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+  return date;
+}
+
+/**
+ * Converts a time string (HH:MM) to a human-readable label.
+ * @param {string} timeStr
+ */
+function timeSlotLabel(timeStr) {
+  var labels = {
+    "09:00": "Morning (9:00 AM – 1:00 PM)",
+    "13:00": "Afternoon (1:00 PM – 5:00 PM)",
+    "14:00": "Afternoon (2:00 PM – 6:00 PM)",
+    "17:00": "Evening (5:00 PM – 9:00 PM)"
+  };
+  return labels[timeStr] || timeStr;
+}
+
+/**
+ * Checks if the requested date and time slot is available on the configured calendar.
+ * @param {string} dateStr - YYYY-MM-DD
+ * @param {string} timeSlot - HH:MM (e.g. "09:00")
+ * @param {number} durationHours
+ * @return {{available: boolean, reason?: string, suggestion?: string}}
+ */
+function checkCalendarAvailability(dateStr, timeSlot, durationHours) {
+  try {
+    var calendar = getCalendar();
+    var startDate = parseDateTime(dateStr, timeSlot);
+    var endDate = new Date(startDate.getTime() + durationHours * 60 * 60 * 1000);
+    var events = calendar.getEvents(startDate, endDate);
+    var conflicts = events.filter(function(e) { return !e.isAllDayEvent(); });
+    if (conflicts.length > 0) {
+      var suggestion = findAvailableSlot(dateStr, durationHours);
+      return {
+        available: false,
+        reason: conflicts.length + " event(s) already booked for this time",
+        suggestion: suggestion
+      };
+    }
+    return { available: true };
+  } catch (error) {
+    return { available: false, reason: "Error checking calendar: " + error.toString() };
+  }
+}
+
+/**
+ * Searches for the next available date/time slot after the requested one.
+ * @param {string} dateStr
+ * @param {number} durationHours
+ * @return {string|null}
+ */
+function findAvailableSlot(dateStr, durationHours) {
+  try {
+    var calendar = getCalendar();
+    var baseDate = new Date(dateStr);
+    for (var d = 0; d < 7; d++) {
+      var checkDate = new Date(baseDate);
+      checkDate.setDate(baseDate.getDate() + d);
+      for (var s = 0; s < PUBLIC_TIME_SLOTS.length; s++) {
+        var startDate = parseDateTime(checkDate.toISOString().split('T')[0], PUBLIC_TIME_SLOTS[s]);
+        var endDate = new Date(startDate.getTime() + durationHours * 60 * 60 * 1000);
+        var events = calendar.getEvents(startDate, endDate);
+        var conflicts = events.filter(function(e) { return !e.isAllDayEvent(); });
+        if (conflicts.length === 0) {
+          var label = timeSlotLabel(PUBLIC_TIME_SLOTS[s]);
+          var dateStr2 = checkDate.toLocaleDateString("en-US", {
+            weekday: "short", month: "short", day: "numeric"
+          });
+          return dateStr2 + " at " + label.split("(")[1].replace(")", "");
+        }
+      }
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Finds an existing customer by email, or creates a new one.
+ * @param {string} name
+ * @param {string} email
+ * @param {string} phone
+ * @return {Object} The customer record (with id).
+ */
+function findOrCreateCustomer(name, email, phone) {
+  var customers = sheetToRecords(getSheet("Customers"));
+  for (var i = 0; i < customers.length; i++) {
+    if (customers[i].email && customers[i].email.toLowerCase() === email.toLowerCase()) {
+      return customers[i];
+    }
+  }
+  /* Not found — create a new customer */
+  return addRecord("Customers", {
+    name: name,
+    email: email,
+    phone: phone,
+    address: "",
+    notes: "Web booking"
+  });
+}
+
+/**
+ * Writes a row to the WebBookings sheet (audit trail for website submissions).
+ * @param {Object} data - The original form data
+ * @param {string} bookingId - The management app's booking ID
+ * @param {string|null} eventId - The calendar event ID (or null)
+ * @param {Date} timestamp
+ * @param {string} clientIP
+ */
+function writeWebBookingRow(data, bookingId, eventId, timestamp, clientIP) {
+  try {
+    var sheet = getSheet("WebBookings");
+    var row = [
+      generateId("WebBookings", "WB"),
+      formatDate(timestamp),
+      data.name || "",
+      data.email || "",
+      data.phone || "",
+      data.eventType || "",
+      data.date || "",
+      data.timeSlot || "",
+      data.guests || "",
+      data.package || "",
+      data.budget || "",
+      PACKAGE_DURATIONS_HOURS[data.package] || 6,
+      eventId || "",
+      data.message || "",
+      "confirmed",
+      JSON.stringify(data)
+    ];
+    sheet.appendRow(row);
+  } catch (err) {
+    console.log("WebBooking row write failed: " + err.toString());
+  }
+}
+
+/**
+ * Logs an activity entry to the ActivityLog sheet.
+ * @param {string} action
+ * @param {string} status
+ * @param {Object} data
+ * @param {string} details
+ * @param {string} clientIP
+ */
+function logPublicActivity(action, status, data, details, clientIP) {
+  try {
+    var spreadsheet = getSpreadsheet();
+    var logSheet = spreadsheet.getSheetByName("ActivityLog");
+    if (!logSheet) {
+      logSheet = spreadsheet.insertSheet("ActivityLog");
+      logSheet.appendRow(["Timestamp", "Action", "Status", "Request Data (JSON)", "Details", "Client IP"]);
+      logSheet.setFrozenRows(1);
+    }
+    logSheet.appendRow([
+      new Date(),
+      action,
+      status,
+      data ? JSON.stringify(data) : "null",
+      details,
+      clientIP || "unknown"
+    ]);
+  } catch (err) {
+    console.log("Activity logging failed: " + err.toString());
+  }
+}
+
 
 /* ==========================================================================
  * GET ENDPOINTS — return arrays of records
@@ -625,13 +1027,13 @@ function getProperties()  { return sheetToRecords(getSheet('Properties')); }
 
 /**
  * Returns calendar events within the [start, end] window from the
- * script owner's primary Google Calendar.
+ * configured calendar (CALENDAR_ID script property, or 'primary' if unset).
  * @param {string} startISO - Optional ISO date string.
  * @param {string} endISO   - Optional ISO date string.
  * @return {Array<Object>} Array of CalendarEvent records.
  */
 function getCalendarEvents(startISO, endISO) {
-  var calendar = CalendarApp.getDefaultCalendar();
+  var calendar = getCalendar();
   var start = startISO ? new Date(startISO) : new Date();
   var end   = endISO   ? new Date(endISO)   : new Date(start.getTime() + 90 * 24 * 60 * 60 * 1000);
   var events = calendar.getEvents(start, end);
@@ -643,12 +1045,12 @@ function getCalendarEvents(startISO, endISO) {
 }
 
 /**
- * Creates a new calendar event on the primary calendar.
+ * Creates a new calendar event on the configured calendar (CALENDAR_ID).
  * @param {Object} data - { bookingId, title, start, end, allDay, color }
  * @return {Object} The created CalendarEvent record.
  */
 function addCalendarEvent(data) {
-  var calendar = CalendarApp.getDefaultCalendar();
+  var calendar = getCalendar();
 
   var start = new Date(data.start);
   var end   = new Date(data.end);
@@ -683,7 +1085,7 @@ function addCalendarEvent(data) {
  * @return {Object} The updated CalendarEvent record.
  */
 function updateCalendarEvent(data) {
-  var calendar = CalendarApp.getDefaultCalendar();
+  var calendar = getCalendar();
   var event = getEventByIdSafe(calendar, data.id);
   if (!event) {
     throw new Error('Calendar event not found: ' + data.id);
@@ -732,7 +1134,7 @@ function updateCalendarEvent(data) {
  * @return {Object} { success: true, id: ... }
  */
 function deleteCalendarEvent(data) {
-  var calendar = CalendarApp.getDefaultCalendar();
+  var calendar = getCalendar();
   var event = getEventByIdSafe(calendar, data.id);
   if (!event) {
     throw new Error('Calendar event not found: ' + data.id);
@@ -916,16 +1318,16 @@ function seedDatabase() {
   customersSheet.appendRow(['C0004', 'Carlos Reyes', 'carlos@example.com', '+639****5678', 'Makati City', '']);
   customersSheet.appendRow(['C0005', 'Anna Petrov', 'anna@example.com', '+141****9012', '123 Lake View', 'VIP']);
 
-  // --- Bookings ---
+  // --- Bookings (with extra columns for website bookings: eventType, guests, budget, specialRequests) ---
   var bookingsSheet = spreadsheet.getSheetByName('Bookings') ||
     spreadsheet.insertSheet('Bookings');
   bookingsSheet.clear();
   bookingsSheet.appendRow(HEADERS.Bookings);
-  bookingsSheet.appendRow(['B0001', 'C0001', 'Lakeside Villa', '2024-01-20', '2024-01-25', 5, 15000, 'confirmed', '2024-01-01']);
-  bookingsSheet.appendRow(['B0002', 'C0002', 'Mountain Cabin', '2024-02-10', '2024-02-14', 4, 10000, 'confirmed', '2024-01-15']);
-  bookingsSheet.appendRow(['B0003', 'C0003', 'Lakeside Villa', '2024-02-20', '2024-02-27', 7, 28000, 'confirmed', '2024-02-01']);
-  bookingsSheet.appendRow(['B0004', 'C0004', 'Mountain Cabin', '2024-03-05', '2024-03-08', 3, 7500, 'pending', '2024-02-20']);
-  bookingsSheet.appendRow(['B0005', 'C0005', 'Lakeside Villa', '2024-03-15', '2024-03-22', 7, 35000, 'confirmed', '2024-03-01']);
+  bookingsSheet.appendRow(['B0001', 'C0001', 'Lakeside Villa', '2024-01-20', '2024-01-25', 5, 15000, 'confirmed', '2024-01-01', 'Pool Party', 20, '', '']);
+  bookingsSheet.appendRow(['B0002', 'C0002', 'Mountain Cabin', '2024-02-10', '2024-02-14', 4, 10000, 'confirmed', '2024-01-15', 'Birthday Celebration', 15, '', '']);
+  bookingsSheet.appendRow(['B0003', 'C0003', 'Lakeside Villa', '2024-02-20', '2024-02-27', 7, 28000, 'confirmed', '2024-02-01', 'Family Gathering', 30, '', '']);
+  bookingsSheet.appendRow(['B0004', 'C0004', 'Mountain Cabin', '2024-03-05', '2024-03-08', 3, 7500, 'pending', '2024-02-20', 'Team Building', 12, '', '']);
+  bookingsSheet.appendRow(['B0005', 'C0005', 'Lakeside Villa', '2024-03-15', '2024-03-22', 7, 35000, 'confirmed', '2024-03-01', 'Pool Party', 25, '', '']);
 
   // --- Supplies ---
   var suppliesSheet = spreadsheet.getSheetByName('Supplies') ||
@@ -954,8 +1356,21 @@ function seedDatabase() {
   configSheet.appendRow(['currency', 'USD']);
   configSheet.appendRow(['taxRate', '0.1']);
 
+  // --- ActivityLog (audit trail for website + management app activity) ---
+  var activityLogSheet = spreadsheet.getSheetByName('ActivityLog') ||
+    spreadsheet.insertSheet('ActivityLog');
+  activityLogSheet.clear();
+  activityLogSheet.appendRow(LOG_COLUMNS);
+  activityLogSheet.setFrozenRows(1);
+
+  // --- WebBookings (audit trail for public website submissions) ---
+  var webBookingsSheet = spreadsheet.getSheetByName('WebBookings') ||
+    spreadsheet.insertSheet('WebBookings');
+  webBookingsSheet.clear();
+  webBookingsSheet.appendRow(HEADERS.WebBookings);
+
   // Format header rows
-  [financesSheet, customersSheet, bookingsSheet, suppliesSheet, propertiesSheet, configSheet].forEach(function(s) {
+  [financesSheet, customersSheet, bookingsSheet, suppliesSheet, propertiesSheet, configSheet, activityLogSheet, webBookingsSheet].forEach(function(s) {
     s.getRange(1, 1, 1, s.getLastColumn()).setFontWeight('bold').setBackground('#e8e8e8');
   });
 
