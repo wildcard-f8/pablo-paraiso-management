@@ -102,7 +102,40 @@ The app supports **optional** Google sign-in. The auth button (`#authBtn` in
    ```
 6. Commit & push — GitHub Pages redeploys automatically.
 
-### What happens when GIS is configured
+### Managing authorized users
+
+Access is restricted to a specific list of Google accounts (an allow-list).
+When a user signs in, the backend verifies their GIS token via Google's
+tokeninfo endpoint and checks their email against the allow-list. Users
+not on the list receive a `403 Forbidden` response and see an "Access denied"
+message in the UI.
+
+To set the allow-list:
+
+1. Open your Apps Script project at `script.google.com`.
+2. In the Apps Script editor's left sidebar, open **Executions** or
+   **Logs** → select `setAuthorizedUsers` from the function dropdown.
+3. Edit the function call to include the emails of users who should have
+   access (comma-separated, in any case):
+   ```js
+   setAuthorizedUsers("you@gmail.com, teammate@company.com, manager@retreat.com")
+   ```
+4. Click **▶ Run** → review and grant permissions if prompted.
+5. The allow-list is now stored in **Script Properties** and persists
+   across deployments.
+
+To view the current allow-list at any time:
+```js
+getAuthorizedUsers()  // prints to Logs (View → Logs)
+```
+
+### What users see
+
+| Scenario | What happens in the UI |
+|---|---|
+| Not signed in | Dashboard shows empty state with "Authentication required" · `#authBtn` pulses orange |
+| Signed in, not authorized | Toast: "user@email is not authorized…" · Dashboard shows empty state |
+| Signed in and authorized | Dashboard charts and summary cards load normally |
 
 | Event | What fires | What the button does |
 |---|---|---|
