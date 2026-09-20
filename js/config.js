@@ -3,8 +3,10 @@
    Replace placeholders before deploying.
 */
 export const CONFIG = {
-  // Google Apps Script web app URL (DEPLOY_HERE prompt). Replace [SCRIPT_ID].
-  API_BASE_URL: "https://script.google.com/macros/s/[SCRIPT_ID]/dev",
+  // Google Apps Script web app URL. Uses /dev (test deployment) — change to
+  // /exec after publishing. Set in script.google.com → Deploy → Web app →
+  // "Who has access": Anyone, even anonymous.
+  API_BASE_URL: "https://script.google.com/macros/s/AKfycbzfgSj6RXHCUDg8_6qStQM4IoMURxpMVGNqPv0rKBIVMLgDO_WpWZbg1xVbg1xVbg1xVbg1xVgahTRLrFP/dev",
 
   // Google Identity Services OAuth 2.0 Client ID. Create one at:
   // https://console.cloud.google.com/ -> APIs & Services -> Credentials
