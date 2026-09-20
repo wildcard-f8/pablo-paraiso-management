@@ -141,7 +141,7 @@ getAuthorizedUsers()  // prints to Logs (View → Logs)
 | Event | What fires | What the button does |
 |---|---|---|
 | `auth.init()` | Loads `https://accounts.google.com/gsi/client`, restores token from `localStorage` | — |
-| User clicks **#authBtn** (signed out) | `auth.signIn()` → `tokenClient.requestAccessToken({ prompt: "consent" })` | Button label flips to "Sign out" (CSS `.signed-in` class toggles) |
+| User clicks **#authBtn** (signed out) | `auth.signIn()` → `tokenClient.requestAccessToken({ prompt: "login" })` | Button label flips to "Sign out" (CSS `.signed-in` class toggles) |
 | User clicks **#authBtn** (signed in) | `auth.signOut()` → clears token, dispatches `auth:changed` | Button label flips to "Sign in" |
 | `auth:changed` event | `app.bindAuth()` listens and toggles `.signed-in` class on `#authBtn` | — |
 | Every `fetchGAS()` call | If `auth.getToken()` is truthy, adds `Authorization: Bearer <token>` header | Token forwarded to backend |
@@ -160,10 +160,14 @@ message on every API call.
 
 ## First-run seeding
 
-On the first run with **empty** Sheets, `app.maybeSeed()` auto-inserts a
-handful of demo records (a customer, two finance rows, a towel supply) so
-charts and tables render immediately. Set `CONFIG.DEMO.seedIfEmpty = false`
-to disable.
+On the first run with **empty** Sheets, `app.maybeSeed()` auto-inserts demo
+records (customers, bookings, finances, supplies) so all dashboard charts and
+tables render immediately. Set `CONFIG.DEMO.seedIfEmpty = false` to disable.
+
+To populate a Sheets file with richer sample data at any time, run the
+`seedDatabase()` function from the Apps Script editor (▶ Run). This inserts
+5 customers, 5 bookings, 8 finance records, 5 supplies, and 2 properties —
+enough to see every chart and stat card populated.
 
 ## Features
 
@@ -207,7 +211,7 @@ to disable.
 
 ### Cross-cutting
 - **Responsive** layout (sidebar collapses to overlay on mobile).
-- **Dark / light** theme toggle (persisted in `localStorage`).
+| **Dark / light** theme toggle in the top bar (persisted in `localStorage`). Auto-detects system preference on first load. Click the 🌙/☀︎ button to switch. Chart colours update live via a `themechange` event.
 - **Toast** notifications for success / error.
 - **Modal** reuse across all CRUD pages.
 
