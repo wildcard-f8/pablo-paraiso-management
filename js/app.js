@@ -380,14 +380,13 @@ const app = {
 
   async checkAndSeedDemo() {
     try {
-      const [fin, cust, book, sup, prop] = await Promise.all([
+      const [fin, cust, book, sup] = await Promise.all([
         api.get("getFinances"),
         api.get("getCustomers"),
         api.get("getBookings"),
         api.get("getSupplies"),
-        api.get("getProperties"),
       ]);
-      const counts = [fin, cust, book, sup, prop].map((x) => (Array.isArray(x) ? x.length : 0));
+      const counts = [fin, cust, book, sup].map((x) => (Array.isArray(x) ? x.length : 0));
       if (counts.every((c) => c === 0)) {
         await this.seedDemoData();
         this.showToast("Demo data seeded for first-run experience.", "info", 5000);
@@ -452,19 +451,19 @@ const app = {
 
     // Bookings
     await api.post("addBooking", {
-      customerId: "C0002", property: "Mountain Cabin", checkIn: "2024-02-10",
+      customerId: "C0002", property: "Pablo Paraiso Pool House", checkIn: "2024-02-10",
       checkOut: "2024-02-14", nights: 4, total: 10000, status: "confirmed", createdAt: "2024-01-15",
     });
     await api.post("addBooking", {
-      customerId: "C0003", property: "Lakeside Villa", checkIn: "2024-02-20",
+      customerId: "C0003", property: "Pablo Paraiso Pool House", checkIn: "2024-02-20",
       checkOut: "2024-02-27", nights: 7, total: 28000, status: "confirmed", createdAt: "2024-02-01",
     });
     await api.post("addBooking", {
-      customerId: "C0004", property: "Mountain Cabin", checkIn: "2024-03-05",
+      customerId: "C0004", property: "Pablo Paraiso Pool House", checkIn: "2024-03-05",
       checkOut: "2024-03-08", nights: 3, total: 7500, status: "pending", createdAt: "2024-02-20",
     });
     await api.post("addBooking", {
-      customerId: "C0005", property: "Lakeside Villa", checkIn: "2024-03-15",
+      customerId: "C0005", property: "Pablo Paraiso Pool House", checkIn: "2024-03-15",
       checkOut: "2024-03-22", nights: 7, total: 35000, status: "confirmed", createdAt: "2024-03-01",
     });
 

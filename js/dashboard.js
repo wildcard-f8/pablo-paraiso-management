@@ -58,7 +58,7 @@ export function createDashboard(_args, ref) {
       </div>
       <div class="card chart-card">
         <h3>Bookings by Status</h3>
-        <canvas id="chartPropertyPerformance" height="160"></canvas>
+        <canvas id="chartBookingsStatus" height="160"></canvas>
       </div>
     </div>
   `;
@@ -274,7 +274,7 @@ function renderCharts(finances, bookings, supplies, customers) {
     completed: "#3b82f6",
     unknown: "#9ca3af",
   };
-  charts.status = new Chart(ctx("chartPropertyPerformance"), {
+  charts.status = new Chart(ctx("chartBookingsStatus"), {
     type: "doughnut",
     data: {
       labels: statusLabels.length ? statusLabels : ["No bookings"],

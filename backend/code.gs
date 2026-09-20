@@ -23,7 +23,7 @@ var HEADERS = {
   Customers:   ['id', 'name', 'email', 'phone', 'address', 'notes'],
   Bookings:    ['id', 'customerId', 'property', 'checkIn', 'checkOut', 'nights', 'total', 'status', 'createdAt', 'eventType', 'guests', 'budget', 'specialRequests'],
   Supplies:    ['id', 'name', 'category', 'quantity', 'unit', 'unitCost', 'lastOrdered', 'supplier', 'minStock'],
-  Properties:  ['id', 'name', 'address', 'capacity', 'dailyRate'],
+                            // Properties tab removed — single venue: "Pablo Paraiso Pool House" (hardcoded in Bookings)
   Config:      ['key', 'value'],
   WebBookings: ['id', 'timestamp', 'name', 'email', 'phone', 'eventType', 'date', 'timeSlot', 'guests', 'package', 'budget', 'duration', 'calendarEventId', 'specialRequests', 'status', 'details']
 };
@@ -34,7 +34,7 @@ var NUMERIC_FIELDS = {
   Customers:  [],
   Bookings:   ['nights', 'total', 'guests'],
   Supplies:   ['quantity', 'unitCost', 'minStock'],
-  Properties: ['capacity', 'dailyRate'],
+                              // Properties removed — single venue (no numeric fields needed)
   Config:     [],
   WebBookings: ['guests', 'duration']
 };
@@ -50,7 +50,7 @@ var ID_PREFIXES = {
   Customers:  'C',
   Bookings:   'B',
   Supplies:   'S',
-  Properties: 'P',
+                              // Properties: 'P' — removed (single venue)
   WebBookings: 'WB'
 };
 
@@ -60,7 +60,7 @@ var SINGULAR = {
   Customers:  'Customer',
   Bookings:   'Booking',
   Supplies:   'Supply',
-  Properties: 'Property',
+                              // Properties: 'Property' — removed (single venue)
   WebBookings: 'Web Booking'
 };
 
@@ -466,6 +466,23 @@ function setAuthorizedUsers() {
 }
 
 /**
+ * Sets the CALENDAR_ID script property so the management app and website
+ * bookings use a dedicated calendar instead of the script owner's default.
+ * Run from the Apps Script editor — edit the calendar ID below first,
+ * then click ▶.
+ */
+function setCalendarId() {
+  var calendarId = "";  /* ← EDIT THIS LINE: e.g. "your-calendar@group.calendar.google.com" */
+  if (calendarId && calendarId !== 'primary') {
+    PropertiesService.getScriptProperties().setProperty('CALENDAR_ID', calendarId);
+    Logger.log('CALENDAR_ID set to: ' + calendarId);
+  } else {
+    PropertiesService.getScriptProperties().setProperty('CALENDAR_ID', 'primary');
+    Logger.log('CALENDAR_ID set to "primary" (default calendar).');
+  }
+}
+
+/**
  * Verifies the GIS access token and checks if the user is authorized.
  * Token is read from the _token query parameter (primary) or the
  * Authorization: Bearer header (fallback). Returns an auth result object.
@@ -550,8 +567,7 @@ function doGet(e) {
       case 'getFinances':       result = getFinances(); break;
       case 'getCustomers':      result = getCustomers(); break;
       case 'getBookings':       result = getBookings(); break;
-      case 'getSupplies':       result = getSupplies(); break;
-      case 'getProperties':     result = getProperties(); break;
+      case 'getSupplies':     result = getSupplies(); break;
       case 'getCalendarEvents': result = getCalendarEvents(e.parameter.start, e.parameter.end); break;
       default:
         return sendError('Unknown action: ' + action);
@@ -1018,7 +1034,9 @@ function getFinances()    { return sheetToRecords(getSheet('Finances')); }
 function getCustomers()   { return sheetToRecords(getSheet('Customers')); }
 function getBookings()    { return sheetToRecords(getSheet('Bookings')); }
 function getSupplies()    { return sheetToRecords(getSheet('Supplies')); }
-function getProperties()  { return sheetToRecords(getSheet('Properties')); }
+  /* getProperties() — REMOVED: single venue (Pablo Paraiso Pool House).
+     Bookings hardcode the property name string. Properties tab no longer
+     created in seedDatabase(). */
 
 
 /* ==========================================================================
@@ -1340,19 +1358,19 @@ function seedDatabase() {
   suppliesSheet.appendRow(['S0004', 'Coffee Beans', 'Kitchen', 2, 'kg', 800, '2024-02-15', 'Roastery', 3]);
   suppliesSheet.appendRow(['S0005', 'Bed Sheets', 'Linens', 12, 'sets', 1200, '2024-01-20', 'ABC Supplier', 6]);
 
-  // --- Properties (single venue: Pablo Paraiso Pool House) ---
-  var propertiesSheet = spreadsheet.getSheetByName('Properties') ||
-    spreadsheet.insertSheet('Properties');
-  propertiesSheet.clear();
-  propertiesSheet.appendRow(HEADERS.Properties);
-  propertiesSheet.appendRow(['P0001', 'Pablo Paraiso Pool House', 'Lakeside Paradise, Laguna de Bay', 30, 0]);
+  // --- Properties — removed: single venue (Pablo Paraiso Pool House) ---
+  // The Properties sheet is no longer used. Bookings hardcode the property
+  // name string directly. If a Properties tab exists (from an old seed),
+  // it is deleted below along with the default Sheet1.
+  var _unusedProperties = spreadsheet.getSheetByName('Properties');
+  if (_unusedProperties) spreadsheet.deleteSheet(_unusedProperties);
 
   // --- Config ---
   var configSheet = spreadsheet.getSheetByName('Config') ||
     spreadsheet.insertSheet('Config');
   configSheet.clear();
   configSheet.appendRow(HEADERS.Config);
-  configSheet.appendRow(['currency', 'USD']);
+  configSheet.appendRow(['currency', 'PHP']);
   configSheet.appendRow(['taxRate', '0.1']);
 
   // --- ActivityLog (audit trail for website + management app activity) ---
@@ -1369,9 +1387,13 @@ function seedDatabase() {
   webBookingsSheet.appendRow(HEADERS.WebBookings);
 
   // Format header rows
-  [financesSheet, customersSheet, bookingsSheet, suppliesSheet, propertiesSheet, configSheet, activityLogSheet, webBookingsSheet].forEach(function(s) {
+  [financesSheet, customersSheet, bookingsSheet, suppliesSheet, configSheet, activityLogSheet, webBookingsSheet].forEach(function(s) {
     s.getRange(1, 1, 1, s.getLastColumn()).setFontWeight('bold').setBackground('#e8e8e8');
   });
+
+  // Remove the default empty "Sheet1" tab that Google Sheets auto-creates
+  var defaultSheet = spreadsheet.getSheetByName('Sheet1');
+  if (defaultSheet) spreadsheet.deleteSheet(defaultSheet);
 
   return {
     success: true,

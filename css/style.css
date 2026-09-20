@@ -450,7 +450,7 @@ p { margin: 0 0 var(--space-3); }
   white-collapse: nowrap;
 }
 .table tbody tr:hover { background: var(--color-surface-2); }
-.table td { color: var(--color-text); }
+.table td { color: var(--color-text); vertical-align: middle; }
 .table .muted { color: var(--color-text-muted); }
 .table .pill {
   display: inline-block;
@@ -510,7 +510,7 @@ p { margin: 0 0 var(--space-3); }
 .btn--sm { padding: 0.3rem 0.65rem; font-size: 0.8rem; }
 
 /* Row action buttons */
-.row-actions { display: flex; gap: var(--space-2); }
+.row-actions { display: flex; gap: var(--space-2); align-items: center; }
 .row-actions .btn--icon {
   width: 32px;
   height: 32px;

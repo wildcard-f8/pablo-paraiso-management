@@ -18,7 +18,6 @@ All responses: `{ "success": true, "data": ... }` or `{ "success": false, "error
 - `?action=getCustomers` → array of Customer records
 - `?action=getBookings` → array of Booking records
 - `?action=getSupplies` → array of Supply records
-- `?action=getProperties` → array of Property records
 - `?action=getCalendarEvents&start=ISO&end=ISO` → array of CalendarEvent records (from the configured CALENDAR_ID)
 - `?action=submitPublicBooking` *(public — no auth)* → `{success, message, bookingId, eventId}`
 
@@ -49,15 +48,12 @@ All responses: `{ "success": true, "data": ... }` or `{ "success": false, "error
 `{id:"C0001", name:"John Smith", email:"john@example.com", phone:"+1234567890", address:"123 Main St", notes:"VIP"}`
 
 ### Booking
-`{id:"B0001", customerId:"C0001", property:"Lakeside Villa", checkIn:"2024-01-20", checkOut:"2024-01-25", nights:5, total:15000, status:"confirmed", createdAt:"2024-01-01", eventType:"Pool Party", guests:20, budget:"", specialRequests:""}`
+|`{id:"B0001", customerId:"C0001", property:"Pablo Paraiso Pool House", checkIn:"2024-01-20", checkOut:"2024-01-25", nights:5, total:15000, status:"confirmed", createdAt:"2024-01-01", eventType:"Pool Party", guests:20, budget:"", specialRequests:""}`|
 
 **New fields** (for website bookings): `eventType`, `guests`, `budget`, `specialRequests`
 
 ### Supply
-`{id:"S0001", name:"Towels", category:"Linens", quantity:20, unit:"pieces", unitCost:500, lastOrdered:"2024-01-01", supplier:"ABC Supplier", minStock:10}`
-
-### Property
-`{id:"P0001", name:"Lakeside Villa", address:"123 Lake View", capacity:6, dailyRate:3000}`
+|`{id:"S0001", name:"Towels", category:"Linens", quantity:20, unit:"pieces", unitCost:500, lastOrdered:"2024-01-01", supplier:"ABC Supplier", minStock:10}`|
 
 ### CalendarEvent
 `{id:"evt1", title:"Booking: John Smith", start:"2024-01-20T15:00:00", end:"2024-01-25T11:00:00", allDay:false, color:"#3b82f6", bookingId:"B0001"}`
@@ -69,7 +65,6 @@ Single spreadsheet with sheets (tabs):
 |- `Customers`: id, name, email, phone, address, notes
 |- `Bookings`: id, customerId, property, checkIn, checkOut, nights, total, status, createdAt, eventType, guests, budget, specialRequests
 |- `Supplies`: id, name, category, quantity, unit, unitCost, lastOrdered, supplier, minStock
-|- `Properties`: id, name, address, capacity, dailyRate
 |- `Config`: key, value (for settings)
 |- `ActivityLog`: Timestamp, Action, Status, Request Data (JSON), Details, Client IP
 |- `WebBookings`: id, timestamp, name, email, phone, eventType, date, timeSlot, guests, package, budget, duration, calendarEventId, specialRequests, status, details
@@ -87,7 +82,7 @@ Single spreadsheet with sheets (tabs):
 - FullCalendar for calendar (CDN)
 - Responsive, clean modern design
 - Pages/sections:
-  1. Dashboard: summary cards + charts (revenue vs expenses, booking income, top properties)
+  1. Dashboard: summary cards + charts (revenue vs expenses, booking income, booking status)
   2. Finances: table + add/edit modal + bar chart (income vs expenses by category)
   3. Customers: table + add/edit modal
   4. Bookings: table + add/edit modal + link to calendar

@@ -25,7 +25,7 @@ access.
    - Create a new Google Sheet named "Pablo Paraiso Management — Database"
    - Set the `SHEET_ID` script property automatically
    - Write headers and sample data to every tab (Finances, Customers,
-     Bookings, Supplies, Properties, Config)
+     Bookings, Supplies, Config)
 
    ⚠️ **Important:** The first run will ask you to review and grant
    permissions for `SpreadsheetApp` and `CalendarApp` scopes. Click through
@@ -63,7 +63,6 @@ Every request returns JSON with the same envelope:
 | `getCustomers`     | —                      | Array of Customer records  |
 | `getBookings`      | —                      | Array of Booking records   |
 | `getSupplies`      | —                      | Array of Supply records    |
-| `getProperties`    | —                      | Array of Property records  |
 | `getCalendarEvents`| `start=ISO&end=ISO`    | Array of CalendarEvent recs|
 
 **Example:**
@@ -121,16 +120,13 @@ Finance      { id:"F0001", date:"2024-01-15", type:"income", category:"Booking",
 Customer     { id:"C0001", name:"John Smith", email:"john@example.com",
                phone:"+123****7890", address:"123 Main St", notes:"VIP" }
 
-Booking      { id:"B0001", customerId:"C0001", property:"Lakeside Villa",
+Booking      { id:"B0001", customerId:"C0001", property:"Pablo Paraiso Pool House",
                checkIn:"2024-01-20", checkOut:"2024-01-25", nights:5,
                total:15000, status:"confirmed", createdAt:"2024-01-01" }
 
 Supply       { id:"S0001", name:"Towels", category:"Linens", quantity:20,
                unit:"pieces", unitCost:500, lastOrdered:"2024-01-01",
                supplier:"ABC Supplier", minStock:10 }
-
-Property     { id:"P0001", name:"Lakeside Villa", address:"123 Lake View",
-               capacity:6, dailyRate:3000 }
 
 CalendarEvent{ id:"evtId...", title:"Booking: John Smith",
                start:"2024-01-20T15:00:00", end:"2024-01-25T11:00:00",
@@ -214,13 +210,26 @@ The backend also handles `OPTIONS` preflight requests via `doOptions(e)`.
 
 | Property     | Where                          | Description                          |
 |--------------|--------------------------------|--------------------------------------|
-| `SHEET_ID`   | Script Properties              | The Google Sheet ID for your database |
+|| `SHEET_ID`   | Script Properties              | The Google Sheet ID for your database |
+|| `CALENDAR_ID`| Script Properties              | Google Calendar ID (e.g. `you@gmail.com` or `group@group.calendar.google.com`). If unset or `"primary"`, falls back to `CalendarApp.getDefaultCalendar()`. |
+|| `AUTHORIZED_USERS` | Script Properties        | Comma-separated list of authorized Google emails |
 
 To set it manually (if `seedDatabase` doesn't do it for you):
 
 1. In the Apps Script editor, click the **gear icon** → **Project settings**
 2. Under **Script properties**, click **Add row**
 3. Key: `SHEET_ID` — Value: `[your-spreadsheet-id]`
+
+**Setting your dedicated calendar:** By default the app uses the script owner's
+default calendar. To use a dedicated project calendar instead:
+
+1. Create or identify a Google Calendar for the project.
+2. In the Apps Script editor, select `setCalendarId` from the function
+   dropdown, **edit the `calendarId` string** inside the function, then click
+   **▶ Run**. The calendar ID is stored in Script Properties.
+3. Alternatively, set it manually: **Project Settings ⚙ → Script properties** →
+   Key: `CALENDAR_ID` — Value: `[your-calendar-id]` (find it at
+   calendar.google.com → Settings → select calendar → "Calendar ID").
 
 ## Development & Testing
 

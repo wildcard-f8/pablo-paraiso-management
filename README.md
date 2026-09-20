@@ -46,7 +46,7 @@ The backend code lives in `backend/code.gs`. Follow these steps:
 
 1. Create a new Google Apps Script project at https://script.google.com.
 2. Add a Google Sheets file with tabs: `Finances`, `Customers`,
-   `Bookings`, `Supplies`, `Properties`, `Config`.
+   `Bookings`, `Supplies`, `Config`.
 3. Write `code.gs` implementing `doGet(e)` / `doPost(e)` routed by the
    `action` query/body parameter (e.g. `?action=getFinances`).
 4. Add the headers below and return JSON `{success, data|error}`.
@@ -70,9 +70,9 @@ function corsHeaders() {
 }
 ```
 
-> **Tip:** if you want the demo to seed its own empty Sheets, the app calls
-> `getProperties` at startup. Ensure the `Properties` tab exists (it can be
-> empty on a fresh sheet).
+> **Tip:** on a fresh sheet, `seedDatabase()` creates all required tabs
+> automatically (no manual setup needed). Just run it from the Apps Script
+> editor (▶ Run) and it inserts the `SHEET_ID` into Script Properties for you.
 
 ## Google Identity Services (OAuth 2.0)
 
@@ -224,7 +224,7 @@ tables render immediately. Set `CONFIG.DEMO.seedIfEmpty = false` to disable.
 
 To populate a Sheets file with richer sample data at any time, run the
 `seedDatabase()` function from the Apps Script editor (▶ Run). This inserts
-5 customers, 5 bookings, 8 finance records, 5 supplies, and 2 properties —
+5 customers, 5 bookings, 8 finance records, and 5 supplies —
 enough to see every chart and stat card populated.
 
 ## Features
@@ -236,7 +236,7 @@ enough to see every chart and stat card populated.
   1. **Revenue vs Expenses** — bar.
   2. **Expenses by Category** — doughnut.
   3. **Booking Income Over Time** — line.
-  4. **Property Performance** — horizontal bar.
+  4. **Bookings by Status** — doughnut.
 
 ### Finances
 - Search + type filter (income / expense / all).
@@ -250,7 +250,7 @@ enough to see every chart and stat card populated.
 
 ### Bookings
 - Search + status filter.
-- Add/edit modal with customer & property dropdowns, date pickers,
+- Add/edit modal with customer dropdown, date pickers,
   nights (auto), total, status.
 - Each row links to the calendar entry.
 

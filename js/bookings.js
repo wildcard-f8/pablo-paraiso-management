@@ -1,17 +1,19 @@
 /* bookings.js - Table CRUD for Booking records + calendar link.
-   Endpoints: getBookings, addBooking, updateBooking, deleteBooking, getProperties, getCustomers.
+   Endpoints: getBookings, addBooking, updateBooking, deleteBooking, getCustomers.
    Model: {id, customerId, property, checkIn, checkOut, nights, total, status}
+   Single property: "Pablo Paraiso Pool House" (hardcoded — no Properties sheet).
 */
 import { api } from "./auth.js?v=9";
 import { utils } from "./utils.js?v=9";
 import { refreshDashboard } from "./dashboard.js?v=9";
 import { CONFIG } from "./config.js?v=9";
 
+const PROPERTY_NAME = "Pablo Paraiso Pool House";
+
 let container = null;
 let appRef = null;
 let data = [];
 let customers = {};
-let properties = {};
 let searchTerm = "";
 let statusFilter = "all";
 
@@ -26,7 +28,7 @@ export function createBookings(_args, ref) {
   section.innerHTML = `
     <div class="toolbar">
       <div class="actions">
-        <input class="search-box" id="bookingSearch" placeholder="Search customer, property…" type="search" inputmode="search" />
+        <input class="search-box" id="bookingSearch" placeholder="Search customer…" type="search" inputmode="search" />
         <select id="bookingStatusFilter">
           <option value="all">All statuses</option>
           <option value="confirmed">Confirmed</option>
@@ -58,14 +60,12 @@ export function createBookings(_args, ref) {
 }
 
 async function loadBookings() {
-  const [bk, cust, prop] = await Promise.all([
+  const [bk, cust] = await Promise.all([
     api.get("getBookings"),
     api.get("getCustomers"),
-    api.get("getProperties"),
   ]);
   data = bk;
   customers = Object.fromEntries(cust.map((c) => [c.id, c]));
-  properties = Object.fromEntries(prop.map((p) => [p.id, p]));
   const byDate = (b) => (b.checkIn || "");
   data.sort((a, b) => byDate(b).localeCompare(byDate(a)));
   renderTable();
@@ -122,18 +122,11 @@ function renderTable() {
   container.appendChild(t);
 }
 
-/* Customer + property option lists for the select dropdowns.
-   NOTE: Customer dropdown uses the customer ID (FK); the Booking model's
-   `property` field is a free-text NAME string (see seed data + dashboard grouping),
-   so the property dropdown must submit the name, not the property id. */
+/* Customer option list for the select dropdown.
+   Property is a single hardcoded value (Pablo Paraiso Pool House),
+   so no dropdown is needed — it is set as a hidden field on submit. */
 function customerOptions() {
   return Object.entries(customers).map(([id, c]) => ({ value: id, label: c.name || id }));
-}
-function propertyOptions() {
-  return Object.entries(properties).map(([id, p]) => ({
-    value: p.name || p.id || "",
-    label: `${p.name || id}${p.capacity ? ` (${p.capacity} guests)` : ""}`,
-  }));
 }
 
 window.appAddBooking = async function () {
@@ -144,7 +137,7 @@ window.appAddBooking = async function () {
     size: "fullscreen",
     fields: [
       { name: "customerId", label: "Customer", type: "select", options: customerOptions(), default: "", required: true },
-      { name: "property", label: "Property", type: "select", options: propertyOptions(), default: "", required: true },
+      { name: "property", type: "hidden", default: PROPERTY_NAME },
       { name: "checkIn", label: "Check-in", type: "date", default: utils.formatDateISO(new Date()), required: true },
       { name: "checkOut", label: "Check-out", type: "date", default: "", required: true },
       { name: "nights", label: "Nights", type: "number", default: "", hint: "Auto-calculated if blank." },
@@ -181,7 +174,7 @@ window.appEditBooking = async function (id) {
     size: "fullscreen",
     fields: [
       { name: "customerId", label: "Customer", type: "select", options: customerOptions(), default: b.customerId || "", required: true },
-      { name: "property", label: "Property", type: "select", options: propertyOptions(), default: b.property || "", required: true },
+      { name: "property", type: "hidden", default: b.property || PROPERTY_NAME },
       { name: "checkIn", label: "Check-in", type: "date", default: b.checkIn || "", required: true },
       { name: "checkOut", label: "Check-out", type: "date", default: b.checkOut || "", required: true },
       { name: "nights", label: "Nights", type: "number", default: b.nights || "" },
