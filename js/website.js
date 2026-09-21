@@ -89,7 +89,8 @@ export function createWebsite() {
     </div>
   `;
 
-  const view = { el: root, _unmount: null };
+  const view = root;  // router expects a DOM element (nodeType === 1)
+  root._unmount = null;
 
   // Load content then render
   loadWebsiteContent().then(() => {
