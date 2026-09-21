@@ -10,6 +10,7 @@ import { createCustomers } from "./customers.js?v=14";
 import { createBookings } from "./bookings.js?v=14";
 import { createCalendar } from "./calendar.js?v=14";
 import { createSupplies } from "./supplies.js?v=14";
+import { createWebsite } from "./website.js?v=14";
 import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=14";
 
 
@@ -25,6 +26,7 @@ const ROUTES = {
   customers: { label: "Customers", factory: createCustomers },
   finances: { label: "Finances", factory: createFinances },
   supplies: { label: "Supplies", factory: createSupplies },
+  website:  { label: "Website",  factory: createWebsite },
   about: { label: "About", factory: createAbout },
 };
 
@@ -185,6 +187,17 @@ const app = {
               api.get("getCustomers"),
               api.get("getSupplies"),
             ]).catch(() => {});
+            /* Fetch website content to apply dynamic logo */
+            api.get("getWebsiteContent").then((data) => {
+              if (data && data.logo) {
+                const logoIcons = document.querySelectorAll(".logo__icon");
+                logoIcons.forEach((img) => {
+                  if (img.src.includes("logo_transparent") || img.src.includes("house")) {
+                    img.src = data.logo + (data.logo.includes("?") ? "&v=" : "?v=") + Date.now();
+                  }
+                });
+              }
+            }).catch(() => {});
             /* Navigate to dashboard (or whatever hash was set) */
             app.navigate(currentParams.page || "dashboard", currentParams.args);
           })
@@ -286,6 +299,8 @@ const app = {
       window.refreshCustomers();
     } else if (page === "supplies" && typeof window.refreshSupplies === "function") {
       window.refreshSupplies();
+    } else if (page === "website" && typeof window.refreshWebsite === "function") {
+      window.refreshWebsite();
     }
   },
 

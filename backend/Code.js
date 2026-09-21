@@ -690,6 +690,117 @@ function removeAuthorizedUser(data) {
 }
 
 /**
+ * Returns website content from the Config sheet.
+ * If a `key` parameter is provided, returns just that key's value (parsed as JSON if possible).
+ * If no key is provided, returns all website content keys as an object.
+ * @param {string} [key] - Optional key name to fetch individually.
+ * @return {Object} Website content object.
+ */
+function getWebsiteContent(key) {
+  var sheet = getSheet('Config');
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) {
+    return key ? '' : {};
+  }
+  var headers = data[0];
+  var keyIdx = headers.indexOf('key');
+  var valIdx = headers.indexOf('value');
+  if (keyIdx === -1 || valIdx === -1) return key ? '' : {};
+
+  var content = {};
+  for (var i = 1; i < data.length; i++) {
+    var k = String(data[i][keyIdx] || '').trim();
+    var v = data[i][valIdx];
+    if (k && k.indexOf('website_') === 0) {
+      content[k.substring(8)] = tryParseJson(v);
+    }
+  }
+
+  if (key) {
+    return content[key] !== undefined ? content[key] : '';
+  }
+  return content;
+}
+
+/**
+ * Updates website content in the Config sheet.
+ * Accepts either a single key-value pair ({ key: "...", value: ... })
+ * or an object of website content: { website_key1: val1, website_key2: val2 }.
+ * @param {Object} data
+ * @return {Object} { success: true, updated: N, content: {...} }
+ */
+function updateWebsiteContent(data) {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Invalid request: expected an object with key/value pairs or { key, value }');
+  }
+
+  var sheet = getSheet('Config');
+  var allData = sheet.getDataRange().getValues();
+  var headers = allData.length > 0 ? allData[0] : ['key', 'value'];
+  var keyIdx = headers.indexOf('key');
+  var valIdx = headers.indexOf('value');
+  if (keyIdx === -1 || valIdx === -1) throw new Error('Config sheet missing key/value columns');
+
+  // Case 1: single { key, value } pair
+  var updates = {};
+  if (data.key && data.value !== undefined) {
+    updates['website_' + String(data.key).trim()] = data.value;
+  } else {
+    // Case 2: object of website_* keys
+    for (var prop in data) {
+      if (data.hasOwnProperty(prop)) {
+        updates['website_' + prop] = data[prop];
+      }
+    }
+  }
+
+  // Build a map of existing rows for quick lookup
+  var rowByKey = {};
+  var nextRow = allData.length + 1; // 1-based, after last data row
+  for (var r = 1; r < allData.length; r++) {
+    var existingKey = String(allData[r][keyIdx] || '').trim();
+    if (existingKey) rowByKey[existingKey] = r + 1;
+  }
+
+  var updated = 0;
+  for (var k in updates) {
+    if (!updates.hasOwnProperty(k)) continue;
+    var val = updates[k];
+    // If value is an object/array, serialize to JSON string
+    var cellValue = (typeof val === 'object' && val !== null) ? JSON.stringify(val) : val;
+
+    if (rowByKey[k]) {
+      // Update existing row
+      sheet.getRange(rowByKey[k], valIdx + 1).setValue(cellValue);
+    } else {
+      // Append new row
+      sheet.appendRow([k, cellValue]);
+      nextRow++;
+    }
+    updated++;
+  }
+
+  // Return the updated content (re-read from sheet for consistency)
+  var result = getWebsiteContent();
+  return { success: true, updated: updated, content: result };
+}
+
+/**
+ * Attempts to parse a string as JSON. If it fails, returns the raw string.
+ * @param {*} val
+ * @return {*}
+ */
+function tryParseJson(val) {
+  if (val === null || val === undefined) return val;
+  if (typeof val !== 'string') return val;
+  try {
+    return JSON.parse(val);
+  } catch (e) {
+    return val;
+  }
+}
+
+/**
  * Sets the CALENDAR_ID script property so the management app and website
  * bookings use a dedicated calendar instead of the script owner's default.
  * Run from the Apps Script editor — edit the calendar ID below first,
@@ -775,17 +886,25 @@ function requireAuth(e) {
 /* ==========================================================================\n * GET ROUTING — doGet(e)  (action in e.parameter)\n * ========================================================================== */
 
 function doGet(e) {
-  /* Require valid GIS token + allow-list check */
+  var action = e.parameter.action;
+  if (!action) {
+    return sendError('Missing "action" parameter');
+  }
+
+  /* ─── Public endpoint: website content (no auth required) ───
+     The public website fetches content via this endpoint so it can
+     render dynamically without requiring user authentication. */
+  if (action === 'getWebsiteContent') {
+    return sendSuccess(getWebsiteContent(e.parameter.key));
+  }
+
+  /* Require valid GIS token + allow-list check for all other actions */
   var _ga = requireAuth(e);
   if (!_ga.valid) {
     return sendError(_ga.error, _ga.status);
   }
-  try {
-    var action = e.parameter.action;
-    if (!action) {
-      return sendError('Missing "action" parameter');
-    }
 
+  try {
     var result;
     switch (action) {
       case 'getFinances':       result = getFinances(); break;
@@ -794,6 +913,7 @@ function doGet(e) {
       case 'getSupplies':       result = getSupplies(); break;
       case 'getCalendarEvents': result = getCalendarEvents(e.parameter.start, e.parameter.end); break;
       case 'getAuthStatus':     result = getAuthStatus(); break;
+      case 'getWebsiteContent': result = getWebsiteContent(e.parameter.key); break;
       default:
         return sendError('Unknown action: ' + action);
     }
@@ -866,6 +986,7 @@ function doPost(e) {
       case 'mergeSpreadsheet':    result = mergeSpreadsheet(data); break;
       case 'addAuthorizedUser':   result = addAuthorizedUser(data); break;
       case 'removeAuthorizedUser':result = removeAuthorizedUser(data); break;
+      case 'updateWebsiteContent': result = updateWebsiteContent(data); break;
       default:
         return sendError('Unknown action: ' + action);
     }
@@ -1602,6 +1723,55 @@ function seedDatabase() {
   configSheet.appendRow(HEADERS.Config);
   configSheet.appendRow(['currency', 'PHP']);
   configSheet.appendRow(['taxRate', '0.1']);
+  // -- Website content (managed from the "Website" section of the management app) --
+  configSheet.appendRow(['website_logo', 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/logo_transparent.png?v=2']);
+  configSheet.appendRow(['website_hero_title', 'Your Lakeside Paradise']);
+  configSheet.appendRow(['website_hero_subtitle', 'Pablo Paraiso is a luxury pool house retreat nestled along the serene shores of Laguna de Bay.']);
+  configSheet.appendRow(['website_hero_cta', 'Book Your Retreat']);
+  configSheet.appendRow(['website_hero_cta_link', '#contact']);
+  configSheet.appendRow(['website_about_title', 'Your Summer Escape Awaits']);
+  configSheet.appendRow(['website_about_subtitle', 'PABLO PARAISO']);
+  configSheet.appendRow(['website_about_description_1', 'A luxury lakeside pool house designed for celebration, connection, and pure relaxation.']);
+  configSheet.appendRow(['website_about_description_2', 'Named after the Spanish phrase for "Paul\'s Paradise," Pablo Paraiso is a serene lakeside retreat where unforgettable moments are made.']);
+  configSheet.appendRow(['website_about_image', 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/lounge.jpg']);
+  configSheet.appendRow(['website_hero_features', JSON.stringify([
+    { title: 'Prime Location', desc: 'Just 30 minutes from Manila, nestled along the scenic shores of Laguna de Bay.' },
+    { title: 'Pool & Villa', desc: 'Swimming pool (3ft–5ft depth) with a one-room villa featuring a private toilet and bathroom.' },
+    { title: 'All Amenities', desc: 'Two shower rooms, dining tables, grill, videoke, and lush garden grounds.' },
+    { title: 'Flexible Pricing', desc: '6-hour and 10-hour packages starting at ₱4,000, plus custom event options.' }
+  ])]);
+  configSheet.appendRow(['website_amenities', JSON.stringify([
+    { title: 'Pool', desc: 'Swimming pool with depths ranging from 3ft to 5ft — perfect for both casual lounging and deep-end fun.' },
+    { title: 'Villa', desc: 'One-room villa with a private toilet and bathroom, ideal for changing, rest, or overnight accommodation.' },
+    { title: 'Shower Rooms', desc: 'Two clean, well-maintained shower facilities with hot and cold water.' },
+    { title: 'Tables', desc: 'Outdoor dining tables seating up to 30 guests, perfect for group meals.' },
+    { title: 'Grill', desc: 'Charcoal and gas grill stations for community barbecues and cooking.' },
+    { title: 'Videoke', desc: 'Entertainment system with a selection of songs for singing and fun.' },
+    { title: 'Garden', desc: 'Lush garden grounds perfect for relaxation, photos, and outdoor activities.' },
+    { title: 'Mini-Golf', desc: 'Putting green and mini-golf course for casual sports and team building.' }
+  ])]);
+  configSheet.appendRow(['website_gallery', JSON.stringify([
+    { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/gallery-3.jpg', alt: 'Mountain lake sunset view' },
+    { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/gallery-1.jpg', alt: 'Luxury resort pool with palm trees' },
+    { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/sunset-lake.jpg', alt: 'Aerial view of lake with mountains' },
+    { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/gallery-4.jpg', alt: 'Lake at sunset with trees' },
+    { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/gallery-2.jpg', alt: 'Pool with lounge chair and umbrella' },
+    { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/barbecue.jpg', alt: 'Group of people around a grill' },
+    { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/pool-party.jpg', alt: 'Lounge chairs by the pool' },
+    { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/team-building.jpg', alt: 'Pool next to lush green hillside' }
+  ])]);
+  configSheet.appendRow(['website_packages', JSON.stringify([
+    { name: '6-Hour Package', price: '₱4,000', duration: '6 hours', guests: 'Up to 30 guests', features: ['Full pool & villa access', 'Shower rooms & tables', 'Grill & videoke', 'Garden grounds', 'Mini-golf course access'] },
+    { name: '10-Hour Package', price: '₱6,000', duration: '10 hours', guests: 'Up to 30 guests', features: ['Full pool & villa access', 'Shower rooms & tables', 'Grill & videoke', 'Garden grounds', 'Mini-golf course access', '4 extra hours for just ₱2,000 more'] },
+    { name: 'Custom Event', price: 'Custom', duration: 'Flexible', guests: 'Up to 30 guests', features: ['Flexible duration', 'Custom menu options', 'Special arrangements', 'Dedicated coordination', 'Mini-golf course access'] }
+  ])]);
+  configSheet.appendRow(['website_testimonials', JSON.stringify([
+    { quote: 'Our company event was absolutely magical. The pool, the food, the atmosphere — everything was perfect!', guest: 'Sarah M.' },
+    { quote: 'We celebrated my 30th birthday here and it was incredible! The pool area, the grill stations, and the overall vibe made it unforgettable.', guest: 'Alex R.' }
+  ])]);
+  configSheet.appendRow(['website_contact_email', 'hello@pabloparaiso.ph']);
+  configSheet.appendRow(['website_contact_phone', '+63 917 123 4567']);
+  configSheet.appendRow(['website_contact_address', 'Along the scenic shores of Laguna de Bay, Philippines']);
 
   // --- ActivityLog (audit trail for website + management app activity) ---
   var activityLogSheet = spreadsheet.getSheetByName('ActivityLog') ||
