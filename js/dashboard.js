@@ -50,19 +50,19 @@ export function createDashboard(_args, ref) {
     <div class="charts-grid">
       <div class="card chart-card">
         <h3>Revenue vs Expenses</h3>
-        <canvas id="chartRevenueExpenses" height="160"></canvas>
+        <canvas id="chartRevenueExpenses" height="240"></canvas>
       </div>
       <div class="card chart-card">
         <h3>Expenses by Category</h3>
-        <canvas id="chartExpensesCategory" height="160"></canvas>
+        <canvas id="chartExpensesCategory" height="240"></canvas>
       </div>
       <div class="card chart-card chart-card--full">
         <h3>Booking Income Over Time</h3>
-        <canvas id="chartBookingIncome" height="150"></canvas>
+        <canvas id="chartBookingIncome" height="240"></canvas>
       </div>
       <div class="card chart-card">
         <h3>Bookings by Status</h3>
-        <canvas id="chartBookingsStatus" height="160"></canvas>
+        <canvas id="chartBookingsStatus" height="240"></canvas>
       </div>
     </div>
   `;
@@ -163,6 +163,7 @@ function renderCharts(finances, bookings, supplies, customers) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       color: C.text,
       plugins: {
         legend: { display: false },
@@ -178,6 +179,7 @@ function renderCharts(finances, bookings, supplies, customers) {
         y: {
           ticks: { color: C.textDim },
           grid: { color: C.grid },
+          beginAtZero: true,
         },
         x: {
           ticks: { color: C.textDim },
@@ -207,6 +209,7 @@ function renderCharts(finances, bookings, supplies, customers) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       color: C.text,
       plugins: {
         legend: {
@@ -253,6 +256,7 @@ function renderCharts(finances, bookings, supplies, customers) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       color: C.text,
       plugins: {
         legend: { display: false },
@@ -268,6 +272,7 @@ function renderCharts(finances, bookings, supplies, customers) {
         y: {
           ticks: { color: C.textDim },
           grid: { color: C.grid },
+          beginAtZero: true,
         },
         x: {
           ticks: { color: C.textDim },
@@ -303,6 +308,7 @@ function renderCharts(finances, bookings, supplies, customers) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       color: C.text,
       plugins: {
         legend: {
@@ -341,6 +347,7 @@ export function refreshCharts() {
        default text colour for every text element (labels, ticks, legend,
        tooltip, title). This is the single most important contrast guard. */
     opts.color = C.text;
+    opts.maintainAspectRatio = false;
     if (opts.scales) {
       ["x", "y"].forEach((axis) => {
         if (opts.scales[axis]) {
