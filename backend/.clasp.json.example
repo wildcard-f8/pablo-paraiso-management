@@ -1,4 +1,4 @@
 {
   "scriptId": "YOUR_SCRIPT_ID_HERE",
-  "filePushOrder": ["code.gs"]
+  "filePushOrder": ["Code.js", "appsscript.json"]
 }
