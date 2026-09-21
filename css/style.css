@@ -1,11 +1,24 @@
 /* ==========================================================================
    Pablo Paraiso Management - Design Tokens
    ========================================================================== */
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Poppins:wght@300;400;500;600;700&display=swap");
+
 :root {
-  /* ── Color palette ── */
-  --color-primary: #3b82f6;
-  --color-primary-elev: #60a5fa;
-  --color-primary-dim: #2563eb;
+  /* ── Color palette (matching Pablo Paraiso website themes) ── */
+  /* Water blue — primary (lakeside water) */
+  --color-primary: #0077BE;
+  --color-primary-elev: #3396e0;
+  --color-primary-dim: #005a87;
+  /* Sunset orange — secondary accent */
+  --color-accent: #FF6B35;
+  --color-accent-elev: #ff8a50;
+  /* Lounge green — success/accent */
+  --color-success: #4CAF50;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+  --color-danger-bg: #7f1d1d;
+
+  /* Dark theme (current default via system preference) */
   --color-bg: #0f172a;
   --color-surface: #1e293b;
   --color-surface-2: #33415a;
@@ -14,29 +27,30 @@
   --color-text: #f1f5f9;
   --color-text-dim: #cbd5e1;
   --color-text-muted: #94a3b8;
-  --color-accent: #a78bfa;
-  --color-success: #4ade80;
-  --color-warning: #fbbf24;
-  --color-danger: #f87171;
-  --color-danger-bg: #7f1d1d;
 
-  /* ── Light theme overrides (applied by .theme-light) ── */
-  --color-bg-light: #f8fafc;
-  --color-surface-light: #ffffff;
-  --color-surface-2-light: #f1f5f9;
-  --color-border-light: #e2e8f0;
-  --color-text-light: #0f172a;
-  --color-text-dim-light: #33415a;
-  --color-text-muted-light: #64748b;
+  /* Light theme overrides (applied by .theme-light) — matches website */
+  --color-bg-light: #F0F8FA;
+  --color-surface-light: #FFFFFF;
+  --color-surface-2-light: #F5F9FC;
+  --color-border-light: #E2E8F0;
+  --color-text-light: #1A1A2E;
+  --color-text-dim-light: #475569;
+  --color-text-muted-light: #64748B;
+
+  /* ── Accent gradient (matches website) ── */
+  --accent-gradient: linear-gradient(135deg, var(--color-primary), var(--color-accent));
 
   /* ── Layout ── */
-  --radius: 0.625rem;
-  --radius-lg: 1rem;
-  --radius-sm: 0.375rem;
+  --radius: 12px;
+  --radius-lg: 20px;
+  --radius-sm: 8px;
+  --radius-full: 999px;
   --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
   --shadow-lg: 0 10px 15rem rgba(0,0,0,0.2);
+  --shadow-card: 0 8px 24px rgba(0, 119, 190, 0.08);
   --transition: 0.15s ease;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Playfair Display", Georgia, serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 
   /* ── Base spacing scale (8pt grid) ── */
@@ -53,7 +67,19 @@
   --sidebar-width-collapsed: 72px;
 }
 
-/* Apply light theme when .theme-light class is on <html> */
+/* Dark theme — base/default (uses website palette) */
+:root {
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+  --color-surface-2: #33415a;
+  --color-border: #475569;
+  --color-border-2: #64748b;
+  --color-text: #f1f5f9;
+  --color-text-dim: #cbd5e1;
+  --color-text-muted: #94a3b8;
+}
+
+/* Light theme — applied when .theme-light class is on <html> (matches website) */
 :root.theme-light {
   --color-bg: var(--color-bg-light);
   --color-surface: var(--color-surface-light);
@@ -62,11 +88,6 @@
   --color-text: var(--color-text-light);
   --color-text-dim: var(--color-text-dim-light);
   --color-text-muted: var(--color-text-muted-light);
-}
-
-/* Default: dark theme (matches system unless overridden) */
-:root:not(.theme-light) {
-  --color-bg: #0f172a;
 }
 
 /* ── Base reset ── */
@@ -154,7 +175,7 @@ ul, ol { list-style: none; margin: 0; padding: 0; }
   font-weight: 700;
   color: var(--color-primary);
 }
-.logo__icon { width: 32px; height: 32px; }
+.logo__icon { width: 40px; height: 40px; object-fit: contain; }
 
 /* Theme toggle */
 .theme-toggle {
@@ -189,13 +210,16 @@ ul, ol { list-style: none; margin: 0; padding: 0; }
 /* Auth button */
 .auth-btn {
   padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-sm);
-  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  background: var(--accent-gradient);
   color: #fff;
   font-weight: 500;
-  transition: background var(--transition), transform var(--transition);
+  transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
 }
-.auth-btn:hover { background: var(--color-primary-elev); transform: translateY(-1px); }
+.auth-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 119, 190, 0.35);
+}
 .auth-btn__signed-in { display: none; }
 .auth-btn.signed-in .auth-btn__signed-out { display: none; }
 .auth-btn.signed-in .auth-btn__signed-in { display: inline; }
@@ -343,8 +367,9 @@ ul, ol { list-style: none; margin: 0; padding: 0; }
   margin-bottom: 1.5rem;
 }
 .auth-gate__logo .logo__icon {
-  width: 40px;
-  height: 40px;
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
 }
 .auth-gate__logo span {
   font-size: 1.5rem;
@@ -454,9 +479,9 @@ ul, ol { list-style: none; margin: 0; padding: 0; }
 .page__slot { max-width: 1200px; margin: 0 auto; width: 100%; position: relative; }
 
 /* ── Typography ── */
-h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: var(--space-4); }
-h2 { font-size: 1.35rem; font-weight: 600; margin-bottom: var(--space-4); }
-h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: var(--space-3); }
+h1 { font-size: 1.75rem; font-family: var(--font-display); font-weight: 700; margin-bottom: var(--space-4); }
+h2 { font-size: 1.35rem; font-family: var(--font-display); font-weight: 600; margin-bottom: var(--space-4); }
+h3 { font-size: 1.05rem; font-family: var(--font-display); font-weight: 600; margin-bottom: var(--space-3); }
 p { margin: 0 0 var(--space-3); }
 
 /* ── Cards ── */
@@ -622,8 +647,8 @@ p { margin: 0 0 var(--space-3); }
   transition: all var(--transition);
   border: 1px solid transparent;
 }
-.btn--primary { background: var(--color-primary); color: #fff; }
-.btn--primary:hover { background: var(--color-primary-elev); transform: translateY(-1px); }
+.btn--primary { background: var(--accent-gradient); color: #fff; }
+.btn--primary:hover { background: var(--accent-gradient); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 119, 190, 0.3); }
 .btn--ghost { background: transparent; color: var(--color-text-dim); border-color: var(--color-border); }
 .btn--ghost:hover { background: var(--color-surface-2); color: var(--color-text); }
 .btn--danger { background: rgba(248,113,113,.2); color: var(--color-danger); border-color: rgba(248,113,113,.4); }
@@ -719,7 +744,7 @@ p { margin: 0 0 var(--space-3); }
 .field textarea:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+  box-shadow: 0 0 0 3px rgba(0, 119, 190, .12);
 }
 .field textarea { resize: vertical; min-height: 80px; }
 .field .hint { font-size: 0.75rem; color: var(--color-text-muted); }
@@ -798,8 +823,8 @@ p { margin: 0 0 var(--space-3); }
 
 /* ── Page loading overlay ── */
 .page-loader {
-  position: absolute;
-  top: 0;
+  position: fixed;
+  top: 64px;
   left: 0;
   right: 0;
   bottom: 0;

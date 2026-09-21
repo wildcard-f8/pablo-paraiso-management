@@ -1,16 +1,16 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=13";
-import { api, auth } from "./auth.js?v=13";
-import { utils, $, $$ } from "./utils.js?v=13";
-import { createDashboard } from "./dashboard.js?v=13";
-import { createFinances } from "./finances.js?v=13";
-import { createCustomers } from "./customers.js?v=13";
-import { createBookings } from "./bookings.js?v=13";
-import { createCalendar } from "./calendar.js?v=13";
-import { createSupplies } from "./supplies.js?v=13";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=13";
+import { CONFIG } from "./config.js?v=14";
+import { api, auth } from "./auth.js?v=14";
+import { utils, $, $$ } from "./utils.js?v=14";
+import { createDashboard } from "./dashboard.js?v=14";
+import { createFinances } from "./finances.js?v=14";
+import { createCustomers } from "./customers.js?v=14";
+import { createBookings } from "./bookings.js?v=14";
+import { createCalendar } from "./calendar.js?v=14";
+import { createSupplies } from "./supplies.js?v=14";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=14";
 
 
 let currentParams = {};
@@ -304,8 +304,8 @@ const app = {
   /* ── Theme ── */
   initTheme() {
     const saved = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const useLight = saved === "light" || (saved === null && !prefersDark);
+    /* Default to light mode (matches Pablo Paraiso website). */
+    const useLight = saved !== "dark";
     document.documentElement.classList.toggle("theme-light", useLight);
     this.syncThemeToggle();
   },
@@ -739,7 +739,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=13";
+export { utils, $, $$ } from "./utils.js?v=14";
 
 /* Export app and default */
 export { app };
