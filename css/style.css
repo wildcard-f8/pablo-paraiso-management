@@ -451,7 +451,7 @@ ul, ol { list-style: none; margin: 0; padding: 0; }
 @media (max-width: 600px) {
   .page { padding: var(--space-4); }
 }
-.page__slot { max-width: 1200px; margin: 0 auto; width: 100%; }
+.page__slot { max-width: 1200px; margin: 0 auto; width: 100%; position: relative; }
 
 /* ── Typography ── */
 h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: var(--space-4); }
@@ -795,6 +795,30 @@ p { margin: 0 0 var(--space-3); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .centered { display: flex; align-items: center; justify-content: center; min-height: 220px; }
+
+/* ── Page loading overlay ── */
+.page-loader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  z-index: 10;
+}
+.page-loader__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+.page-loader__text {
+  color: var(--color-text-dim);
+  font-size: 0.875rem;
+}
 
 /* ── Calendar (FullCalendar theme tweaks) ── */
 .calendar-card { padding: var(--space-5); }

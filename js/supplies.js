@@ -2,10 +2,10 @@
    Endpoints: getSupplies, addSupply, updateSupply, deleteSupply.
    Model: {id, name, category, quantity, unit, unitCost, lastOrdered, supplier, minStock}
 */
-import { api } from "./auth.js?v=12";
-import { utils } from "./utils.js?v=12";
-import { CONFIG } from "./config.js?v=12";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=12";
+import { api } from "./auth.js?v=13";
+import { utils } from "./utils.js?v=13";
+import { CONFIG } from "./config.js?v=13";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=13";
 
 let container = null;
 let data = [];
@@ -61,7 +61,14 @@ export function createSupplies(_args, ref) {
     renderTable();
   });
 
-  loadSupplies().catch((err) => appRef.showToast(`Load failed: ${err.message}`, "error"));
+  appRef.showPageLoader("Loading supplies…");
+  loadSupplies().catch((err) => {
+    if (!err.message?.includes("Authentication required") && !err.message?.includes("not authorized") && !err.message?.includes("Invalid token")) {
+      appRef.showToast(`Load failed: ${err.message}`, "error");
+    }
+  }).finally(() => {
+    appRef.hidePageLoader();
+  });
 
   const unmount = function unmount() { container = null; };
   section._unmount = unmount;

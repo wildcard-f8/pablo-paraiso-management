@@ -2,9 +2,9 @@
    Charts: revenue vs expenses (bar), booking income over time (line),
            expenses by category (doughnut), bookings by status (doughnut).
 */
-import { api } from "./auth.js?v=12";
-import { utils } from "./utils.js?v=12";
-import { CONFIG } from "./config.js?v=12";
+import { api } from "./auth.js?v=13";
+import { utils } from "./utils.js?v=13";
+import { CONFIG } from "./config.js?v=13";
 
 let charts = {};
 let dashboardRoot = null;
@@ -82,6 +82,7 @@ export function createDashboard(_args, ref) {
 async function loadDashboard() {
   const slot = dashboardRoot && dashboardRoot.querySelector("#statsGrid");
   if (!slot) return;
+  appRef.showPageLoader("Loading dashboard…");
   try {
     const [finances, bookings, customers, supplies] = await Promise.all([
       api.get("getFinances"),
@@ -115,6 +116,7 @@ async function loadDashboard() {
       : `Net negative: ${utils.formatCurrency(Math.abs(net))}`;
 
     renderCharts(finances, bookings, supplies, customers);
+    appRef.hidePageLoader();
   } catch (err) {
     /* If the error is auth-related, the auth:required/auth:denied handler
        already showed the appropriate toast — don't double-notify. */
@@ -122,6 +124,7 @@ async function loadDashboard() {
     if (!msg.includes("Authentication required") && !msg.includes("not authorized") && !msg.includes("Invalid token")) {
       appRef.showToast(`Failed to load dashboard: ${msg}`, "error");
     }
+    appRef.hidePageLoader();
     const s = dashboardRoot && dashboardRoot.querySelector("#statsGrid");
     if (s) s.innerHTML = `<div class="empty-state"><p>${utils.escapeHTML(utils.capitalize(msg))}</div></div>`;
   }

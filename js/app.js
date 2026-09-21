@@ -1,16 +1,16 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=12";
-import { api, auth } from "./auth.js?v=12";
-import { utils, $, $$ } from "./utils.js?v=12";
-import { createDashboard } from "./dashboard.js?v=12";
-import { createFinances } from "./finances.js?v=12";
-import { createCustomers } from "./customers.js?v=12";
-import { createBookings } from "./bookings.js?v=12";
-import { createCalendar } from "./calendar.js?v=12";
-import { createSupplies } from "./supplies.js?v=12";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=12";
+import { CONFIG } from "./config.js?v=13";
+import { api, auth } from "./auth.js?v=13";
+import { utils, $, $$ } from "./utils.js?v=13";
+import { createDashboard } from "./dashboard.js?v=13";
+import { createFinances } from "./finances.js?v=13";
+import { createCustomers } from "./customers.js?v=13";
+import { createBookings } from "./bookings.js?v=13";
+import { createCalendar } from "./calendar.js?v=13";
+import { createSupplies } from "./supplies.js?v=13";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=13";
 
 
 let currentParams = {};
@@ -89,6 +89,22 @@ const app = {
     }
   },
 
+  /* ── Page loading overlay ── */
+  showPageLoader(message = "Loading…") {
+    const slot = $("#pageSlot");
+    if (!slot) return;
+    /* Only show if not already loading */
+    if (slot.querySelector(".page-loader")) return;
+    const loader = document.createElement("div");
+    loader.className = "page-loader";
+    loader.innerHTML = `<div class="page-loader__content"><span class="spinner"></span><span class="page-loader__text">${message}</span></div>`;
+    slot.appendChild(loader);
+  },
+  hidePageLoader() {
+    const el = $("#pageSlot .page-loader");
+    if (el) el.remove();
+  },
+
   /* -- Auth (Google Identity Services) -- */
   bindAuth() {
     auth.init();
@@ -159,6 +175,16 @@ const app = {
             /* Token is valid and user is authorized — reveal the app */
             hideVerifying();
             syncGate();
+            /* Preload all entity data in parallel to warm the 60s cache.
+             * This eliminates cold-start latency when the user navigates
+             * to any page. Silently fail — individual pages will retry
+             * on their own with their own loading states. */
+            Promise.all([
+              api.get("getFinances"),
+              api.get("getBookings"),
+              api.get("getCustomers"),
+              api.get("getSupplies"),
+            ]).catch(() => {});
             /* Navigate to dashboard (or whatever hash was set) */
             app.navigate(currentParams.page || "dashboard", currentParams.args);
           })
@@ -713,7 +739,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=12";
+export { utils, $, $$ } from "./utils.js?v=13";
 
 /* Export app and default */
 export { app };

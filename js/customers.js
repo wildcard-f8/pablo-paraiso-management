@@ -2,9 +2,9 @@
    Endpoints: getCustomers, addCustomer, updateCustomer, deleteCustomer.
    Model: {id,name,email,phone,address,notes}
 */
-import { api } from "./auth.js?v=12";
-import { utils } from "./utils.js?v=12";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=12";
+import { api } from "./auth.js?v=13";
+import { utils } from "./utils.js?v=13";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=13";
 
 let container = null;
 let data = [];
@@ -49,7 +49,14 @@ export function createCustomers(_args, ref) {
     renderTable();
   });
 
-  loadCustomers().catch((err) => appRef.showToast(`Load failed: ${err.message}`, "error"));
+  appRef.showPageLoader("Loading customers…");
+  loadCustomers().catch((err) => {
+    if (!err.message?.includes("Authentication required") && !err.message?.includes("not authorized") && !err.message?.includes("Invalid token")) {
+      appRef.showToast(`Load failed: ${err.message}`, "error");
+    }
+  }).finally(() => {
+    appRef.hidePageLoader();
+  });
 
   const unmount = function unmount() { container = null; };
   section._unmount = unmount;
