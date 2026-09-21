@@ -463,7 +463,7 @@ p { margin: 0 0 var(--space-3); }
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  white-collapse: nowrap;
+  white-space: nowrap;
 }
 .table tbody tr:hover { background: var(--color-surface-2); }
 .table td { color: var(--color-text); vertical-align: middle; }
