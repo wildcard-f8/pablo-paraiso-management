@@ -2,9 +2,9 @@
    Endpoints: getCustomers, addCustomer, updateCustomer, deleteCustomer.
    Model: {id,name,email,phone,address,notes}
 */
-import { api } from "./auth.js?v=16";
-import { utils } from "./utils.js?v=16";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=16";
+import { api } from "./auth.js?v=17";
+import { utils } from "./utils.js?v=17";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=17";
 
 let container = null;
 let data = [];

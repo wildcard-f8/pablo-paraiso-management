@@ -1,17 +1,17 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=16";
-import { api, auth } from "./auth.js?v=16";
-import { utils, $, $$ } from "./utils.js?v=16";
-import { createDashboard } from "./dashboard.js?v=16";
-import { createFinances } from "./finances.js?v=16";
-import { createCustomers } from "./customers.js?v=16";
-import { createBookings } from "./bookings.js?v=16";
-import { createCalendar } from "./calendar.js?v=16";
-import { createSupplies } from "./supplies.js?v=16";
-import { createWebsite } from "./website.js?v=16";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=16";
+import { CONFIG } from "./config.js?v=17";
+import { api, auth } from "./auth.js?v=17";
+import { utils, $, $$ } from "./utils.js?v=17";
+import { createDashboard } from "./dashboard.js?v=17";
+import { createFinances } from "./finances.js?v=17";
+import { createCustomers } from "./customers.js?v=17";
+import { createBookings } from "./bookings.js?v=17";
+import { createCalendar } from "./calendar.js?v=17";
+import { createSupplies } from "./supplies.js?v=17";
+import { createWebsite } from "./website.js?v=17";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=17";
 
 
 let currentParams = {};
@@ -74,7 +74,7 @@ const app = {
     });
     $("#themeToggle").addEventListener("click", () => app.toggleTheme());
 
-    /* Export button — saves a local JSON copy of all backend data */
+    /* Export button — saves a local ZIP with CSV files of all backend data */
     const exportBtn = $("#exportBtn");
     if (exportBtn) {
       exportBtn.addEventListener("click", () => {
@@ -82,7 +82,7 @@ const app = {
       });
     }
 
-    /* Import (merge) button — uploads a local JSON backup to merge with online data */
+    /* Import (merge) button — uploads a local CSV/ZIP backup to merge with online data */
     const importBtn = $("#importBtn");
     if (importBtn) {
       importBtn.addEventListener("click", () => {
@@ -364,7 +364,7 @@ const app = {
       fileInput = document.createElement("input");
       fileInput.type = "file";
       fileInput.id = "importFileInput";
-      fileInput.accept = ".json,application/json";
+      fileInput.accept = ".zip,application/zip,.csv,text/csv,text/plain";
       fileInput.style.display = "none";
       document.body.appendChild(fileInput);
     }
@@ -754,7 +754,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=16";
+export { utils, $, $$ } from "./utils.js?v=17";
 
 /* Export app and default */
 export { app };
