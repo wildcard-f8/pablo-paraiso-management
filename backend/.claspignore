@@ -1,3 +1,4 @@
-# .claspignore — only push code.gs to the Apps Script project
+# .claspignore — only push code.gs and manifest to the Apps Script project
 *
 !code.gs
+!appsscript.json
