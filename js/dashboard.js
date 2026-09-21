@@ -16,7 +16,10 @@ let loadGeneration = 0;
    passing "var(--color-text-dim)" results in a fallback of black. */
 function resolveColor(cssVar) {
   const val = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
-  return val || "#000000";
+  /* Fallback must be a light colour — the default theme is dark.
+     A black fallback (#000) on a dark canvas makes text completely
+     unreadable if CSS vars have not loaded or the query fails. */
+  return val || "#f1f5f9";
 }
 
 /* Theme-aware color palette for charts */
@@ -160,6 +163,7 @@ function renderCharts(finances, bookings, supplies, customers) {
     },
     options: {
       responsive: true,
+      color: C.text,
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -203,6 +207,7 @@ function renderCharts(finances, bookings, supplies, customers) {
     },
     options: {
       responsive: true,
+      color: C.text,
       plugins: {
         legend: {
           position: "bottom",
@@ -248,6 +253,7 @@ function renderCharts(finances, bookings, supplies, customers) {
     },
     options: {
       responsive: true,
+      color: C.text,
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -297,6 +303,7 @@ function renderCharts(finances, bookings, supplies, customers) {
     },
     options: {
       responsive: true,
+      color: C.text,
       plugins: {
         legend: {
           position: "bottom",
@@ -330,6 +337,10 @@ export function refreshCharts() {
        after a theme switch without re-rendering data. */
     const C = chartColors();
     const opts = c.options;
+    /* Global font colour — Chart.js v4 respects options.color as the
+       default text colour for every text element (labels, ticks, legend,
+       tooltip, title). This is the single most important contrast guard. */
+    opts.color = C.text;
     if (opts.scales) {
       ["x", "y"].forEach((axis) => {
         if (opts.scales[axis]) {
