@@ -10,6 +10,7 @@ import { createCustomers } from "./customers.js?v=9";
 import { createBookings } from "./bookings.js?v=9";
 import { createCalendar } from "./calendar.js?v=9";
 import { createSupplies } from "./supplies.js?v=9";
+import { exportSpreadsheet } from "./export.js?v=9";
 
 
 let currentParams = {};
@@ -68,6 +69,14 @@ const app = {
       if (e.target === $("#modalOverlay")) app.closeModal();
     });
     $("#themeToggle").addEventListener("click", () => app.toggleTheme());
+
+    /* Export button — saves a local JSON copy of all backend data */
+    const exportBtn = $("#exportBtn");
+    if (exportBtn) {
+      exportBtn.addEventListener("click", () => {
+        app.exportData();
+      });
+    }
   },
 
   /* -- Auth (Google Identity Services) -- */
@@ -260,6 +269,21 @@ const app = {
     localStorage.setItem("theme", isLight ? "light" : "dark");
     this.syncThemeToggle();
     document.dispatchEvent(new CustomEvent("themechange", { detail: { isLight } }));
+  },
+
+  /* ── Offline export ── */
+  async exportData() {
+    const btn = $("#exportBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "⏳ Exporting…"; }
+    try {
+      const filename = await exportSpreadsheet((msg) => {
+        this.showToast(msg, "info", 5000);
+      });
+    } catch (err) {
+      this.showToast("Export failed: " + (err.message || "Unknown error"), "error", 5000);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "💾 Export"; }
+    }
   },
 
   /* ── Modal API ── */
