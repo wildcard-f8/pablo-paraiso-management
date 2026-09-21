@@ -231,7 +231,8 @@ export const api = {
     const singular = { addCustomer: "getCustomers", updateCustomer: "getCustomers", deleteCustomer: "getCustomers",
       addFinance: "getFinances", updateFinance: "getFinances", deleteFinance: "getFinances",
       addBooking: "getBookings", updateBooking: "getBookings", deleteBooking: "getBookings",
-      addSupply: "getSupplies", updateSupply: "getSupplies", deleteSupply: "getSupplies" };
+      addSupply: "getSupplies", updateSupply: "getSupplies", deleteSupply: "getSupplies",
+      updateWebsiteContent: "getWebsiteContent" };
     if (singular[action]) invalidateCache(singular[action]);
     return result;
   },
