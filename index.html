@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <!-- FullCalendar v6 (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
-  <link rel="stylesheet" href="css/style.css?v=11" />
+  <link rel="stylesheet" href="css/style.css?v=12" />
   <!-- NOTE: this project is an ES module app; scripts use import maps / type=module -->
 </head>
 <body>
@@ -66,6 +66,21 @@
         <button class="btn btn--ghost btn--sm" id="importBtn" title="Upload local backup to merge with online data">
           ⬆ Import
         </button>
+        <div class="notification-wrapper">
+          <button class="notification-bell" id="notificationBell" title="Notification history" aria-label="Notification history">
+            <span class="notification-bell__icon">🔔</span>
+            <span class="notification-bell__badge" id="notificationBadge" style="display:none;"></span>
+          </button>
+          <div class="notification-dropdown" id="notificationDropdown" style="display:none;">
+            <div class="notification-dropdown__header">
+              <span class="notification-dropdown__title">Notifications</span>
+              <button class="notification-dropdown__clear" id="notificationClear" title="Clear all">Clear all</button>
+            </div>
+            <div class="notification-list" id="notificationList">
+              <div class="notification-list__empty">No notifications yet.</div>
+            </div>
+          </div>
+        </div>
         <button class="auth-btn" id="authBtn" title="Sign in with Google">
           <span class="auth-btn__signed-out">Sign in</span>
           <span class="auth-btn__signed-in">Sign out</span>
@@ -118,6 +133,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=11"></script>
+  <script type="module" src="js/app.js?v=12"></script>
 </body>
 </html>

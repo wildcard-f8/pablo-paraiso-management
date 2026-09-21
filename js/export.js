@@ -2,7 +2,7 @@
    Export all entities as JSON for local storage,
    and import a local backup to merge with online data.
 */
-import { api } from "./auth.js?v=11";
+import { api } from "./auth.js?v=12";
 
 /**
  * Fetches all data entities from the backend.

@@ -1,16 +1,16 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=11";
-import { api, auth } from "./auth.js?v=11";
-import { utils, $, $$ } from "./utils.js?v=11";
-import { createDashboard } from "./dashboard.js?v=11";
-import { createFinances } from "./finances.js?v=11";
-import { createCustomers } from "./customers.js?v=11";
-import { createBookings } from "./bookings.js?v=11";
-import { createCalendar } from "./calendar.js?v=11";
-import { createSupplies } from "./supplies.js?v=11";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=11";
+import { CONFIG } from "./config.js?v=12";
+import { api, auth } from "./auth.js?v=12";
+import { utils, $, $$ } from "./utils.js?v=12";
+import { createDashboard } from "./dashboard.js?v=12";
+import { createFinances } from "./finances.js?v=12";
+import { createCustomers } from "./customers.js?v=12";
+import { createBookings } from "./bookings.js?v=12";
+import { createCalendar } from "./calendar.js?v=12";
+import { createSupplies } from "./supplies.js?v=12";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=12";
 
 
 let currentParams = {};
@@ -51,6 +51,7 @@ const app = {
       this.bindShell();
       this.bindAuth();
       this.initTheme();
+      this.initNotifications();
       this.parseHash();  // render initial route
     } catch (err) {
       console.error("App init error:", err);
@@ -174,13 +175,14 @@ const app = {
       }
     });
 
-    /* Backend returned 401 — token invalid/expired: sign out and prompt sign-in */
+    /* Backend returned 401 — token invalid/expired: sign out and reset the gate */
     document.addEventListener("auth:required", (e) => {
-      /* Debounce: only show the first auth:required toast until user re-signs-in */
+      /* Debounce: only handle the first auth:required until user re-signs-in */
       if (authErrorActive) return;
       authErrorActive = true;
       auth.signOut();  // clear stale token so the gate shows "Sign in"
-      app.showToast(e.detail?.message || "Please sign in to view this page.", "info");
+      /* No toast here — the user just signed in with Google, so a "please sign in"
+       * notification is confusing. The auth gate visually shows the sign-in button. */
       btn.classList.add("pulse");
       setTimeout(() => btn.classList.remove("pulse"), 6000);
       hideVerifying();
@@ -462,6 +464,21 @@ const app = {
 
   /* ── Toast ── */
   showToast(message, type = "info", duration = 3200) {
+    /* Store in notification history */
+    const notif = { id: Date.now(), message, type, timestamp: new Date().toISOString() };
+    this._notifications = this._notifications || [];
+    this._notifications.unshift(notif);
+    /* Keep last 50 */
+    if (this._notifications.length > 50) this._notifications = this._notifications.slice(0, 50);
+    /* Persist to localStorage */
+    try { localStorage.setItem("paraiso_notifications", JSON.stringify(this._notifications)); } catch { /* ignore */ }
+    /* Update badge */
+    const badge = $("#notificationBadge");
+    if (badge) {
+      badge.textContent = String(this._notifications.length);
+      badge.style.display = "inline-flex";
+    }
+
     const container = $("#toastContainer");
     const t = document.createElement("div");
     t.className = `toast ${type}`;
@@ -478,7 +495,88 @@ const app = {
     }, duration);
   },
 
-  /* ── Seeding (first-run demo data) ── */
+/* ── Notification history ── */
+    initNotifications() {
+    /* Load persisted notifications */
+    try {
+    const saved = localStorage.getItem("paraiso_notifications");
+    this._notifications = saved ? JSON.parse(saved) : [];
+    } catch {
+    this._notifications = [];
+    }
+    this._renderNotifications();
+
+    /* Bell click → toggle dropdown */
+    const bell = $("#notificationBell");
+    const dropdown = $("#notificationDropdown");
+    if (bell) {
+    bell.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this._toggleDropdown();
+    });
+    }
+    /* Close dropdown when clicking outside */
+    document.addEventListener("click", (e) => {
+    if (dropdown && !dropdown.contains(e.target) && dropdown.style.display !== "none") {
+      dropdown.style.display = "none";
+    }
+    });
+    /* "Clear all" button */
+    const clearBtn = $("#notificationClear");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => this.clearNotifications());
+    }
+  },
+
+    _toggleDropdown() {
+    const dropdown = $("#notificationDropdown");
+    const bell = $("#notificationBell");
+    if (!dropdown) return;
+    if (dropdown.style.display === "none" || dropdown.style.display === "") {
+    dropdown.style.display = "block";
+    this._renderNotifications();
+    /* Mark as read: clear badge */
+    const badge = $("#notificationBadge");
+    if (badge) badge.style.display = "none";
+    } else {
+    dropdown.style.display = "none";
+    }
+    },
+
+    _renderNotifications() {
+    const list = $("#notificationList");
+    const badge = $("#notificationBadge");
+    if (!list) return;
+    const notifs = this._notifications || [];
+    if (notifs.length === 0) {
+    list.innerHTML = '<div class="notification-list__empty">No notifications yet.</div>';
+    if (badge) badge.style.display = "none";
+    return;
+    }
+    list.innerHTML = "";
+    notifs.forEach((n) => {
+    const item = document.createElement("div");
+    item.className = `notification-item notification-item--${n.type || "info"}`;
+    const time = new Date(n.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    item.innerHTML = `<span class="notification-item__msg">${n.message}</span><span class="notification-item__time">${time}</span>`;
+    list.appendChild(item);
+    });
+    if (badge) {
+    badge.textContent = String(notifs.length);
+    badge.style.display = "inline-flex";
+    }
+    },
+
+    clearNotifications() {
+    this._notifications = [];
+    try { localStorage.removeItem("paraiso_notifications"); } catch { /* ignore */ }
+    const list = $("#notificationList");
+    if (list) list.innerHTML = '<div class="notification-list__empty">No notifications yet.</div>';
+    const badge = $("#notificationBadge");
+    if (badge) badge.style.display = "none";
+    },
+
+    /* ── Seeding (first-run demo data) ── */
   maybeSeed() {
     if (!CONFIG.DEMO.seedIfEmpty) return;
     this.checkAndSeedDemo();
@@ -615,7 +713,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=11";
+export { utils, $, $$ } from "./utils.js?v=12";
 
 /* Export app and default */
 export { app };
