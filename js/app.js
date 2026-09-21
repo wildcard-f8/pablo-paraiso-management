@@ -349,7 +349,7 @@ const app = {
     } catch (err) {
       this.showToast("Export failed: " + (err.message || "Unknown error"), "error", 5000);
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = "💾 Export"; }
+      if (btn) { btn.disabled = false; btn.textContent = "💾 Export CSV"; }
     }
   },
 
@@ -358,29 +358,30 @@ const app = {
     const btn = $("#importBtn");
     if (btn) { btn.disabled = true; btn.textContent = "⏳ Importing…"; }
 
-    /* Create a hidden file input on demand */
+    /* Create a hidden file input on demand — accept multiple CSV files or a ZIP */
     let fileInput = $("#importFileInput");
     if (!fileInput) {
       fileInput = document.createElement("input");
       fileInput.type = "file";
       fileInput.id = "importFileInput";
       fileInput.accept = ".zip,application/zip,.csv,text/csv,text/plain";
+      fileInput.multiple = true;
       fileInput.style.display = "none";
       document.body.appendChild(fileInput);
     }
 
-    const file = await new Promise((resolve) => {
-      fileInput.onchange = () => resolve(fileInput.files[0]);
+    const files = await new Promise((resolve) => {
+      fileInput.onchange = () => resolve(Array.from(fileInput.files));
       fileInput.click();
     });
 
-    if (!file) {
-      if (btn) { btn.disabled = false; btn.textContent = "⬆ Import"; }
+    if (!files || files.length === 0) {
+      if (btn) { btn.disabled = false; btn.textContent = "⬆ Import CSV"; }
       return;
     }
 
     try {
-      const result = await importSpreadsheet(file, (msg) => {
+      const result = await importSpreadsheet(files, (msg) => {
         this.showToast(msg, "info", 5000);
       });
 
@@ -406,7 +407,7 @@ const app = {
     } catch (err) {
       this.showToast("Import failed: " + (err.message || "Unknown error"), "error", 5000);
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = "⬆ Import"; }
+      if (btn) { btn.disabled = false; btn.textContent = "⬆ Import CSV"; }
       fileInput.value = "";
     }
   },

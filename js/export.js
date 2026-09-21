@@ -237,8 +237,8 @@ export async function exportSpreadsheet(onProgress = () => {}) {
 /* ── Import ── */
 
 /**
- * Reads a local ZIP backup file (containing CSV files) and merges it with
- * online data. Also accepts individual CSV files.
+ * Reads local CSV/ZIP backup files and merges them with online data.
+ * Accepts a single file (ZIP or CSV) or an array of files (multiple CSVs).
  *
  * Merge strategy: additive + update-only, never delete.
  *   - New local records → inserted online
@@ -247,51 +247,58 @@ export async function exportSpreadsheet(onProgress = () => {}) {
  *   - Conflicts → flagged, online version kept
  *   - Deletions → never propagated
  *
- * @param {File} file - ZIP file with CSVs (or individual CSV)
+ * @param {File|File[]} fileOrFiles - ZIP file with CSVs, or one+ CSV files
  * @param {Function} [onProgress] - optional callback(message) for status updates
  * @return {Promise<Object>} merge results
  */
-export async function importSpreadsheet(file, onProgress = () => {}) {
+export async function importSpreadsheet(fileOrFiles, onProgress = () => {}) {
   onProgress("Reading local backup…");
 
+  // Normalise to an array — accept both a single file and multiple files
+  const files = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
   const entityKeys = ["finances", "customers", "bookings", "supplies", "calendarEvents"];
-  const isZip = file.name.endsWith(".zip") || file.type === "application/zip" || file.type === "application/x-zip-compressed";
 
   let payload = { data: {} };
 
-  if (isZip) {
-    onProgress("Extracting ZIP…");
-    const arrayBuffer = await readFileAsArrayBuffer(file);
-    const zip = await JSZip.loadAsync(arrayBuffer);
+  // Process each file
+  for (const file of files) {
+    const isZip = file.name.endsWith(".zip") || file.type === "application/zip" || file.type === "application/x-zip-compressed";
 
-    const csvFiles = Object.keys(zip.files).filter((name) => name.endsWith(".csv") && name !== "README.csv");
+    if (isZip) {
+      onProgress("Extracting ZIP…");
+      const arrayBuffer = await readFileAsArrayBuffer(file);
+      const zip = await JSZip.loadAsync(arrayBuffer);
 
-    for (const name of csvFiles) {
-      const csvText = await zip.files[name].async("string");
-      // Derive entity key from filename (e.g. "finances.csv" → "finances")
-      const key = name.replace(/\.csv$/, "").replace(/^.*\//, "");
-      if (entityKeys.includes(key)) {
-        const records = parseCSV(csvText);
-        payload.data[key] = records;
-        onProgress(`  ${key}: ${records.length} records`);
+      const csvFiles = Object.keys(zip.files).filter((name) =>
+        name.endsWith(".csv") && name !== "README.csv"
+      );
+
+      for (const name of csvFiles) {
+        const csvText = await zip.files[name].async("string");
+        const key = name.replace(/\.csv$/, "").replace(/^.*\//, "");
+        if (entityKeys.includes(key)) {
+          const records = parseCSV(csvText);
+          payload.data[key] = records;
+          onProgress(`  ${key}: ${records.length} records`);
+        }
       }
-    }
-  } else if (file.name.endsWith(".csv") || file.type === "text/csv" || file.type === "text/plain") {
-    // Single CSV file — try to determine entity from filename
-    const csvText = await file.text();
-    const key = file.name.replace(/\.csv$/, "").toLowerCase();
+    } else if (file.name.endsWith(".csv") || file.type === "text/csv" || file.type === "text/plain") {
+      // Individual CSV file — derive entity from filename
+      const csvText = await file.text();
+      const key = file.name.replace(/\.csv$/, "").toLowerCase();
 
-    onProgress(`  ${key}: parsing…`);
-    const records = parseCSV(csvText);
-    onProgress(`  ${key}: ${records.length} records`);
+      onProgress(`  ${key}: parsing…`);
+      const records = parseCSV(csvText);
+      onProgress(`  ${key}: ${records.length} records`);
 
-    if (entityKeys.includes(key)) {
-      payload.data[key] = records;
+      if (entityKeys.includes(key)) {
+        payload.data[key] = records;
+      } else {
+        throw new Error(`Unknown CSV entity in filename: "${key}". Expected one of: ${entityKeys.join(", ")}`);
+      }
     } else {
-      throw new Error(`Unknown CSV entity in filename: "${key}". Expected one of: ${entityKeys.join(", ")}`);
+      throw new Error("Please upload a .zip file or .csv files.");
     }
-  } else {
-    throw new Error("Please upload a .zip file (containing CSV files) or a single .csv file.");
   }
 
   const totalRecords = entityKeys.reduce((sum, k) => sum + (payload.data[k] || []).length, 0);
