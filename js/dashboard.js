@@ -9,6 +9,7 @@ import { CONFIG } from "./config.js?v=14";
 let charts = {};
 let dashboardRoot = null;
 let appRef = null;
+let loadGeneration = 0;
 
 /* Resolve a CSS custom property to its actual computed value so Chart.js
    can use it. Chart.js does NOT understand CSS variables on its own —
@@ -68,7 +69,7 @@ export function createDashboard(_args, ref) {
   // document by the router before the await resolves, so DOM queries that
   // depend on being live in-document succeed.
   dashboardRoot = section;
-
+  loadGeneration++;
   loadDashboard();
 
   section._unmount = function unmount() {
@@ -80,6 +81,7 @@ export function createDashboard(_args, ref) {
 }
 
 async function loadDashboard() {
+  const myGeneration = loadGeneration;
   const slot = dashboardRoot && dashboardRoot.querySelector("#statsGrid");
   if (!slot) return;
   appRef.showPageLoader("Loading dashboard…");
@@ -115,6 +117,8 @@ async function loadDashboard() {
       ? `Net positive: ${utils.formatCurrency(net)}`
       : `Net negative: ${utils.formatCurrency(Math.abs(net))}`;
 
+    // Guard: if a newer dashboard load is in flight, skip this stale render
+    if (myGeneration !== loadGeneration) return;
     renderCharts(finances, bookings, supplies, customers);
     appRef.hidePageLoader();
   } catch (err) {
@@ -126,11 +130,16 @@ async function loadDashboard() {
     }
     appRef.hidePageLoader();
     const s = dashboardRoot && dashboardRoot.querySelector("#statsGrid");
-    if (s) s.innerHTML = `<div class="empty-state"><p>${utils.escapeHTML(utils.capitalize(msg))}</div></div>`;
+    if (s) s.innerHTML = `<div class="empty-state"><p>${utils.escapeHTML(utils.capitalize(msg))}</p></div>`;
   }
 }
 
 function renderCharts(finances, bookings, supplies, customers) {
+  // Safety net: destroy any existing charts before creating new ones
+  // (prevents "Canvas already in use" when the same canvas is reused)
+  Object.values(charts).forEach((c) => { if (c) c.destroy(); });
+  charts = {};
+
   const ctx = (id) => document.getElementById(id);
   const C = chartColors();
 
