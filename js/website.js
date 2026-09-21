@@ -5,9 +5,9 @@
    Changes to the logo URL are saved to the backend Config sheet and
    immediately applied to both the website and the management app logo.
 */
-import { CONFIG } from "./config.js?v=14";
-import { api } from "./auth.js?v=14";
-import { utils, $, $$ } from "./utils.js?v=14";
+import { CONFIG } from "./config.js?v=15";
+import { api } from "./auth.js?v=15";
+import { utils, $, $$ } from "./utils.js?v=15";
 
 /* ── List-type sections: key → { fields, arrayField, layout } ── */
 const LIST_SECTIONS = {
@@ -200,7 +200,7 @@ function renderScalarCard(label, key, inputType, hasPreview = false) {
       ? `<img src="${escapeHtml(val)}" alt="Logo Preview" class="website-logo-preview">`
       : `<img src="${escapeHtml(val)}" alt="Preview" class="website-image-preview">`)
       : "";
-    inputEl = `<input type="url" class="field-input" data-key="${key}" placeholder="${label}" value="${escapeHtml(val)}">${preview}`;
+    inputEl = `<input type="url" class="field-input" data-key="${key}" placeholder="${label}" value="${escapeHtml(val)}">${preview}<button type="button" class="btn btn--sm btn--icon upload-btn" data-upload-key="${key}" title="Upload image">📷</button>`;
   } else {
     inputEl = `<input type="${inputType}" class="field-input" data-key="${key}" placeholder="${label}" value="${escapeHtml(val)}">`;
   }
@@ -275,11 +275,14 @@ function renderListItem(key, item, idx, config) {
     extraHTML = `<input type="text" class="field-input" data-list="${key}" data-idx="${idx}" data-field="${config.arrayField}" value="${escapeHtml(val)}" placeholder="${config.arrayField.charAt(0).toUpperCase() + config.arrayField.slice(1)}">`;
   }
 
-  // Gallery image preview
+  // Gallery image preview + upload button
   if (key === "gallery") {
     const src = item.src || "";
+    const uploadBtn = `<button type="button" class="btn btn--sm btn--icon upload-btn" data-upload-list="${key}" data-upload-idx="${idx}" title="Upload image">📷</button>`;
     if (src) {
-      extraHTML = `<img src="${escapeHtml(src)}" alt="Preview" class="website-image-preview" style="margin-top: var(--space-2);">` + extraHTML;
+      extraHTML = `<img src="${escapeHtml(src)}" alt="Preview" class="website-image-preview" style="margin-top: var(--space-2);">` + uploadBtn + extraHTML;
+    } else {
+      extraHTML = uploadBtn + extraHTML;
     }
   }
 
@@ -403,6 +406,25 @@ function bindEvents(root) {
     }
   });
 
+  // Upload button click handler (delegated)
+  root.addEventListener("click", (e) => {
+    const btn = e.target.closest(".upload-btn");
+    if (!btn) return;
+    e.preventDefault();
+    const key = btn.dataset.uploadKey;
+    const listKey = btn.dataset.uploadList;
+    const idx = parseInt(btn.dataset.uploadIdx);
+    let targetInput = null;
+    if (key) {
+      targetInput = root.querySelector(`input[data-key="${key}"]`);
+    } else if (listKey && idx >= 0) {
+      targetInput = root.querySelector(`input[data-list="${listKey}"][data-idx="${idx}"][data-field="src"]`);
+    }
+    if (!targetInput) return;
+    handleImageUpload(targetInput, btn);
+  });
+
+  // Delegate events for action buttons
   root.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-action]");
     if (!btn) return;
@@ -535,6 +557,87 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/* ── Image upload ───────────────────────────────────────────────── */
+/**
+ * Opens a file picker, reads the selected image as base64, uploads it
+ * via the backend uploadImage endpoint, and sets the result into the
+ * target input field + preview image.
+ * @param {HTMLInputElement} targetInput - The URL input to populate
+ * @param {HTMLElement} uploadBtn - The button that triggered the upload (for status feedback)
+ */
+function handleImageUpload(targetInput, uploadBtn) {
+  // Create a hidden file input
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "image/*";
+  fileInput.style.display = "none";
+
+  fileInput.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Size guard — keep under GAS 50MB POST limit
+    var MAX_BYTES = 45 * 1024 * 1024; // 45 MB
+    if (file.size > MAX_BYTES) {
+      app.showToast("Image too large (max 45 MB). Please resize.", "error", 4000);
+      return;
+    }
+
+    // Show loading state on the upload button
+    const originalText = uploadBtn.textContent;
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = "⏳";
+
+    // Read file as base64 (without data URL prefix)
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        // Strip the data URL prefix to get raw base64
+        const dataUrl = ev.target.result;
+        const base64Data = dataUrl.split(",")[1];
+
+        const response = await api.post("uploadImage", {
+          filename: file.name,
+          data: base64Data,
+          mimeType: file.type,
+        });
+
+        // Set the URL in the input field
+        targetInput.value = response.url;
+        targetInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+        // Update preview if this is a logo/about_image
+        const card = targetInput.closest(".website-card");
+        if (card) {
+          const existingPreview = card.querySelector(".website-logo-preview, .website-image-preview");
+          if (existingPreview) {
+            existingPreview.src = response.url + (response.url.includes("?") ? "&v=" : "?v=") + Date.now();
+          }
+        }
+
+        app.showToast("Image uploaded!", "success", 2000);
+      } catch (err) {
+        app.showToast("Upload failed: " + (err.message || "Unknown error"), "error", 4000);
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = originalText;
+        fileInput.remove();
+      }
+    };
+    reader.onerror = () => {
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = originalText;
+      app.showToast("Failed to read file.", "error", 3000);
+      fileInput.remove();
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Trigger file selection
+  document.body.appendChild(fileInput);
+  fileInput.click();
 }
 
 export default { createWebsite };

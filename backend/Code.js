@@ -987,6 +987,7 @@ function doPost(e) {
       case 'addAuthorizedUser':   result = addAuthorizedUser(data); break;
       case 'removeAuthorizedUser':result = removeAuthorizedUser(data); break;
       case 'updateWebsiteContent': result = updateWebsiteContent(data); break;
+      case 'uploadImage':          result = uploadImage(data); break;
       default:
         return sendError('Unknown action: ' + action);
     }
@@ -1886,4 +1887,48 @@ function seedWebsiteContent() {
   });
 
   return { success: true, added: added, message: 'Added ' + added + ' website content keys to Config sheet.' };
+}
+
+/**
+ * Uploads an image file to Google Drive and returns a direct URL.
+ * Expects: { filename: "...", data: "base64...", mimeType: "..." }
+ * Files are stored in a "Pablo Paraiso - Website Images" Drive folder
+ * and made publicly viewable (anyone with the link can view).
+ * @param {Object} data - { filename, data (base64), mimeType }
+ * @return {Object} { url, fileId, filename }
+ */
+function uploadImage(data) {
+  if (!data || !data.filename || !data.data) {
+    throw new Error('filename and data (base64) are required');
+  }
+  var mimeType = data.mimeType || 'image/jpeg';
+  // Decode base64 to bytes
+  var decodedBytes = Utilities.base64Decode(data.data);
+  var blob = Utilities.newBlob(decodedBytes, mimeType, data.filename);
+
+  // Get or create the website images folder
+  var folderName = 'Pablo Paraiso - Website Images';
+  var folders = DriveApp.getFoldersByName(folderName);
+  var folder;
+  if (folders.hasNext()) {
+    folder = folders.next();
+  } else {
+    folder = DriveApp.createFolder(folderName);
+  }
+
+  // Upload the file
+  var file = folder.createFile(blob);
+
+  // Make it publicly accessible (viewable by anyone with the link)
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  var fileId = file.getId();
+  // Direct image URL for <img> tags
+  var url = 'https://drive.google.com/uc?id=' + fileId;
+
+  return {
+    url: url,
+    fileId: fileId,
+    filename: data.filename,
+  };
 }
