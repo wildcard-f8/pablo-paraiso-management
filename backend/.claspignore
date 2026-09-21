@@ -1,5 +1,3 @@
-# .claspignore — exclude everything except code.gs
+# .claspignore — only push code.gs to the Apps Script project
 *
 !code.gs
-!README.md
-!CLASP.md
