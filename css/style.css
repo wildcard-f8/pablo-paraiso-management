@@ -651,6 +651,8 @@ p { margin: 0 0 var(--space-3); }
 .btn--primary:hover { background: var(--accent-gradient); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 119, 190, 0.3); }
 .btn--ghost { background: transparent; color: var(--color-text-dim); border-color: var(--color-border); }
 .btn--ghost:hover { background: var(--color-surface-2); color: var(--color-text); }
+.btn--secondary { background: var(--color-surface-2); color: var(--color-text-dim); border-color: var(--color-border); }
+.btn--secondary:hover { background: var(--color-surface); color: var(--color-text); }
 .btn--danger { background: rgba(248,113,113,.2); color: var(--color-danger); border-color: rgba(248,113,113,.4); }
 .btn--danger:hover { background: rgba(248,113,113,.3); }
 .btn--sm { padding: 0.3rem 0.65rem; font-size: 0.8rem; }
