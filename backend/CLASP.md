@@ -30,9 +30,9 @@ clasp login
    clasp pull
    ```
 
-## Deploy a Change
+**Deploy a Change**
 
-After editing `code.gs` locally:
+After editing `Code.js` locally:
 
 ```bash
 cd backend
@@ -42,7 +42,7 @@ clasp deploy --deploymentId YOUR_DEPLOYMENT_ID --description "Description"
 ```
 
 Or via the Apps Script UI: after `clasp push`, go to the Apps Script editor, click
-**Deploy → Manage deployments → Edit → Deploy new version**.
+**Deploy → New deployment** → **Select type: Web app** → **Deploy**.
 
 ## Key Benefits
 
