@@ -92,13 +92,16 @@ export function createWebsite() {
   const view = root;  // router expects a DOM element (nodeType === 1)
   root._unmount = null;
 
-  // Load content then render
-  loadWebsiteContent().then(() => {
-    renderContent();
-    bindEvents(root);
-  }).catch(err => {
-    $("#websiteGrid").innerHTML = `<p class="error">Failed to load: ${err.message}</p>`;
-  });
+  // Defer to next microtask so root is in the DOM before we query for #websiteGrid
+  setTimeout(() => {
+    loadWebsiteContent().then(() => {
+      renderContent();
+      bindEvents(root);
+    }).catch(err => {
+      const grid = $("#websiteGrid");
+      if (grid) grid.innerHTML = `<p class="error">Failed to load: ${err.message}</p>`;
+    });
+  }, 0);
 
   // Global refresh hook
   window.refreshWebsite = () => {
