@@ -5,17 +5,28 @@
 import { api } from "./auth.js?v=9";
 import { utils } from "./utils.js?v=9";
 import { CONFIG } from "./config.js?v=9";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=9";
 
 let container = null;
 let data = [];
 let appRef = null;
 let searchTerm = "";
+let sortState = null;
 
-function buildColumns() {
-  return ["Name", "Category", "Quantity", "Unit", "Unit Cost", "Stock Value", "Last Ordered", "Supplier", "Min Stock"];
-}
+/* Column definitions with key/label/type for sorting */
+const COLUMNS = [
+  { key: "name", label: "Name", type: "string" },
+  { key: "category", label: "Category", type: "string" },
+  { key: "quantity", label: "Quantity", type: "number" },
+  { key: "unit", label: "Unit", type: "string" },
+  { key: "unitCost", label: "Unit Cost", type: "number" },
+  { key: "stockValue", label: "Stock Value", type: "number" },
+  { key: "lastOrdered", label: "Last Ordered", type: "date" },
+  { key: "supplier", label: "Supplier", type: "string" },
+  { key: "minStock", label: "Min Stock", type: "number" },
+];
 
-export function createSupplies(_args, ref) {
+export function createSuppliers(_args, ref) {
   appRef = ref;
   const section = document.createElement("section");
   section.className = "supplies-page";
@@ -40,6 +51,16 @@ export function createSupplies(_args, ref) {
     renderTable();
   });
 
+  /* Sortable column headers */
+  container.addEventListener("click", (e) => {
+    const th = e.target.closest("th.sortable");
+    if (!th) return;
+    const col = COLUMNS.find((c) => c.key === th.dataset.col);
+    if (!col) return;
+    sortState = toggleSort(sortState, col.key);
+    renderTable();
+  });
+
   loadSupplies().catch((err) => appRef.showToast(`Load failed: ${err.message}`, "error"));
 
   const unmount = function unmount() { container = null; };
@@ -51,7 +72,6 @@ let showLowStockOnly = false;
 
 async function loadSupplies() {
   data = await api.get("getSupplies");
-  data = data.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   updateLowStockBanner();
   renderTable();
 }
@@ -78,56 +98,113 @@ window.appToggleLowStock = function () {
   renderTable();
 };
 
+function enrich(s) {
+  const unitCost = Number(s.unitCost || 0);
+  const qty = Number(s.quantity || 0);
+  const low = isLowStock(s);
+  return {
+    id: s.id,
+    name: utils.escapeHTML(s.name || "") + (low ? ' <span class="pill pill--danger">⚠ low</span>' : ""),
+    category: utils.escapeHTML(s.category || ""),
+    quantity: qty,
+    unit: utils.escapeHTML(s.unit || ""),
+    unitCost: utils.formatCurrency(unitCost),
+    stockValue: utils.formatCurrency(unitCost * qty),
+    lastOrdered: utils.formatDate(s.lastOrdered),
+    supplier: utils.escapeHTML(s.supplier || ""),
+    minStock: s.minStock ?? "",
+    _low: low,
+    _sortName: utils.escapeHTML(s.name || ""),
+    _sortCategory: utils.escapeHTML(s.category || ""),
+    _sortUnit: utils.escapeHTML(s.unit || ""),
+    _sortSupplier: utils.escapeHTML(s.supplier || ""),
+    _sortQuantity: qty,
+    _sortUnitCost: unitCost,
+    _sortStockValue: unitCost * qty,
+    _sortLastOrdered: s.lastOrdered || "",
+    _sortMinStock: Number(s.minStock || 0),
+  };
+}
+
+function applySortEnriched(rows, cols, sortState) {
+  if (!sortState || !sortState.column) return rows;
+  const col = cols.find((c) => c.key === sortState.column);
+  if (!col) return rows;
+  const dir = sortState.direction === "desc" ? -1 : 1;
+  return [...rows].sort((a, b) => dir * sortCompare(a, b, col));
+}
+
+function sortCompare(a, b, col) {
+  var av = a["_sort" + capitalize(col.key)] !== undefined ? a["_sort" + capitalize(col.key)] : a[col.key];
+  var bv = b["_sort" + capitalize(col.key)] !== undefined ? b["_sort" + capitalize(col.key)] : b[col.key];
+  if (col.type === "number") {
+    return (Number(av) || 0) - (Number(bv) || 0);
+  }
+  if (col.type === "date") {
+    return new Date(av || 0).getTime() - new Date(bv || 0).getTime();
+  }
+  return String(av || "").localeCompare(String(bv || ""));
+}
+
+function capitalize(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 function renderTable() {
   if (!container) return;
-  const cols = buildColumns();
+  const cols = COLUMNS;
   const term = searchTerm.toLowerCase();
-  const rows = data
-    .filter((s) => {
-      const text = `${s.name || ""} ${s.category || ""} ${s.supplier || ""}`.toLowerCase();
-      const matches = !term || text.includes(term);
-      const lowOk = !showLowStockOnly || isLowStock(s);
-      return matches && lowOk;
-    })
-    .map((s) => {
-      const unitCost = Number(s.unitCost || 0);
-      const qty = Number(s.quantity || 0);
-      const low = isLowStock(s);
-      return {
-        id: s.id,
-        Name: utils.escapeHTML(s.name || "") + (low ? ' <span class="pill pill--danger">⚠ low</span>' : ""),
-        Category: utils.escapeHTML(s.category || ""),
-        Quantity: qty,
-        Unit: utils.escapeHTML(s.unit || ""),
-        "Unit Cost": utils.formatCurrency(unitCost),
-        "Stock Value": utils.formatCurrency(unitCost * qty),
-        "Last Ordered": utils.formatDate(s.lastOrdered),
-        Supplier: utils.escapeHTML(s.supplier || ""),
-        "Min Stock": s.minStock ?? "",
-        _low: low,
-      };
-    });
+  const filtered = data.filter((s) => {
+    const text = `${s.name || ""} ${s.category || ""} ${s.supplier || ""}`.toLowerCase();
+    const matches = !term || text.includes(term);
+    const lowOk = !showLowStockOnly || isLowStock(s);
+    return matches && lowOk;
+  });
+  const enriched = filtered.map(enrich);
+  const sorted = applySortEnriched(enriched, cols, sortState);
 
   const t = document.createElement("table");
   t.className = "table";
-  t.innerHTML =
-    `<thead><tr>${cols.map((c) => `<th>${c}</th>`).join("")}<th>Actions</th></tr></thead><tbody></tbody>`;
-  const tbody = t.querySelector("tbody");
-  if (!rows.length) {
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  cols.forEach((col) => {
+    const th = sortableHeader(col.label, sortState, col.key);
+    th.dataset.col = col.key;
+    headerRow.appendChild(th);
+  });
+  const actionsTh = document.createElement("th");
+  actionsTh.textContent = "Actions";
+  headerRow.appendChild(actionsTh);
+  thead.appendChild(headerRow);
+  t.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  if (sorted.length === 0) {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td colspan="${cols.length + 1}" class="empty-msg">No supplies match your filter.</td>`;
     tbody.appendChild(tr);
   }
-  rows.forEach((row) => {
+  sorted.forEach((row) => {
     const tr = document.createElement("tr");
     if (row._low) tr.style.background = "rgba(248,113,113,.08)";
     tr.dataset.id = row.id;
-    tr.innerHTML =
-      `<td>${row.Name}</td><td>${row.Category}</td><td>${row.Quantity}</td><td>${row.Unit}</td><td>${row["Unit Cost"]}</td><td>${row["Stock Value"]}</td><td>${row["Last Ordered"]}</td><td>${row.Supplier}</td><td>${row["Min Stock"]}</td>` +
-      `<td class="row-actions"><button class="btn btn--sm btn--icon" title="Edit" onclick="appEditSupply('${row.id}')">✏</button>` +
-      `<button class="btn btn--sm btn--icon btn--danger" title="Delete" onclick="appDeleteSupply('${row.id}')">🗑</button></td>`;
+    const cells = cols.map((col) => {
+      const td = document.createElement("td");
+      // Use enriched (formatted) values for display
+      td.innerHTML = row[col.key];
+      return td;
+    });
+    const actionsTd = document.createElement("td");
+    actionsTd.className = "row-actions";
+    actionsTd.innerHTML =
+      `<button class="btn btn--sm btn--icon" title="Edit" onclick="appEditSupply('${row.id}')">✏</button>` +
+      `<button class="btn btn--sm btn--icon btn--danger" title="Delete" onclick="appDeleteSupply('${row.id}')">🗑</button>`;
+    cells.push(actionsTd);
+    cells.forEach((td) => tr.appendChild(td));
     tbody.appendChild(tr);
   });
+  t.appendChild(tbody);
+
   container.innerHTML = "";
   container.appendChild(t);
 }

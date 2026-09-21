@@ -4,15 +4,21 @@
 */
 import { api } from "./auth.js?v=9";
 import { utils } from "./utils.js?v=9";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=9";
 
 let container = null;
 let data = [];
 let searchTerm = "";
 let appRef = null;
+let sortState = null;
 
-function buildColumns() {
-  return ["Name", "Email", "Phone", "Address"];
-}
+/* Column definitions with key/label/type for sorting */
+const COLUMNS = [
+  { key: "name", label: "Name", type: "string" },
+  { key: "email", label: "Email", type: "string" },
+  { key: "phone", label: "Phone", type: "string" },
+  { key: "address", label: "Address", type: "string" },
+];
 
 export function createCustomers(_args, ref) {
   appRef = ref;
@@ -33,6 +39,16 @@ export function createCustomers(_args, ref) {
     renderTable();
   });
 
+  /* Sortable column headers */
+  container.addEventListener("click", (e) => {
+    const th = e.target.closest("th.sortable");
+    if (!th) return;
+    const col = COLUMNS.find((c) => c.key === th.dataset.col);
+    if (!col) return;
+    sortState = toggleSort(sortState, col.key);
+    renderTable();
+  });
+
   loadCustomers().catch((err) => appRef.showToast(`Load failed: ${err.message}`, "error"));
 
   const unmount = function unmount() { container = null; };
@@ -42,34 +58,45 @@ export function createCustomers(_args, ref) {
 
 async function loadCustomers() {
   data = await api.get("getCustomers");
-  data = data.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   renderTable();
 }
 
 function renderTable() {
   if (!container) return;
-  const cols = buildColumns();
+  const cols = COLUMNS;
   const term = searchTerm.toLowerCase();
-  const rows = data
-    .filter((c) =>
-      !term ||
-      (c.name || "").toLowerCase().includes(term) ||
-      (c.email || "").toLowerCase().includes(term) ||
-      (c.phone || "").toLowerCase().includes(term)
-    )
-    .map((c) => ({
-      id: c.id,
-      Name: utils.escapeHTML(c.name || ""),
-      Email: utils.escapeHTML(c.email || ""),
-      Phone: utils.escapeHTML(c.phone || ""),
-      Address: utils.escapeHTML(c.address || ""),
-    }));
+  const filtered = data.filter((c) =>
+    !term ||
+    (c.name || "").toLowerCase().includes(term) ||
+    (c.email || "").toLowerCase().includes(term) ||
+    (c.phone || "").toLowerCase().includes(term)
+  );
+  const sorted = applySort(filtered, cols, sortState);
+
+  const rows = sorted.map((c) => ({
+    id: c.id,
+    Name: utils.escapeHTML(c.name || ""),
+    Email: utils.escapeHTML(c.email || ""),
+    Phone: utils.escapeHTML(c.phone || ""),
+    Address: utils.escapeHTML(c.address || ""),
+  }));
 
   const t = document.createElement("table");
   t.className = "table";
-  t.innerHTML =
-    `<thead><tr>${cols.map((c) => `<th>${c}</th>`).join("")}<th>Actions</th></tr></thead><tbody></tbody>`;
-  const tbody = t.querySelector("tbody");
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  cols.forEach((col) => {
+    const th = sortableHeader(col.label, sortState, col.key);
+    th.dataset.col = col.key;
+    headerRow.appendChild(th);
+  });
+  const actionsTh = document.createElement("th");
+  actionsTh.textContent = "Actions";
+  headerRow.appendChild(actionsTh);
+  thead.appendChild(headerRow);
+  t.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
   if (!rows.length) {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td colspan="${cols.length + 1}" class="empty-msg">No customers match your filter.</td>`;
@@ -78,12 +105,22 @@ function renderTable() {
   rows.forEach((row) => {
     const tr = document.createElement("tr");
     tr.dataset.id = row.id;
-    tr.innerHTML =
-      `<td>${row.Name}</td><td>${row.Email}</td><td>${row.Phone}</td><td>${row.Address}</td>` +
-      `<td class="row-actions"><button class="btn btn--sm btn--icon" title="Edit" onclick="appEditCustomer('${row.id}')">✏</button>` +
-      `<button class="btn btn--sm btn--icon btn--danger" title="Delete" onclick="appDeleteCustomer('${row.id}')">🗑</button></td>`;
+    const cells = cols.map((col) => {
+      const td = document.createElement("td");
+      td.innerHTML = row[col.label];
+      return td;
+    });
+    const actionsTd = document.createElement("td");
+    actionsTd.className = "row-actions";
+    actionsTd.innerHTML =
+      `<button class="btn btn--sm btn--icon" title="Edit" onclick="appEditCustomer('${row.id}')">✏</button>` +
+      `<button class="btn btn--sm btn--icon btn--danger" title="Delete" onclick="appDeleteCustomer('${row.id}')">🗑</button>`;
+    cells.push(actionsTd);
+    cells.forEach((td) => tr.appendChild(td));
     tbody.appendChild(tr);
   });
+  t.appendChild(tbody);
+
   container.innerHTML = "";
   container.appendChild(t);
 }

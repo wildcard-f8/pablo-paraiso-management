@@ -62,7 +62,6 @@ export function sortableHeader(label, sortState, column) {
   const th = document.createElement("th");
   th.textContent = label + indicator;
   th.className = "sortable" + (active ? " active" : "");
-  th.style.cursor = "pointer";
   th.dataset.sortCol = column;
   return th;
 }

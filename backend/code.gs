@@ -19,10 +19,10 @@
  * ========================================================================== */
 
 var HEADERS = {
-  Finances:    ['id', 'date', 'type', 'category', 'description', 'amount', 'bookingId'],
-  Customers:   ['id', 'name', 'email', 'phone', 'address', 'notes'],
-  Bookings:    ['id', 'customerId', 'property', 'checkIn', 'checkOut', 'nights', 'total', 'status', 'createdAt', 'eventType', 'guests', 'budget', 'specialRequests'],
-  Supplies:    ['id', 'name', 'category', 'quantity', 'unit', 'unitCost', 'lastOrdered', 'supplier', 'minStock'],
+  Finances:    ['id', 'date', 'type', 'category', 'description', 'amount', 'bookingId', 'lastModified'],
+  Customers:   ['id', 'name', 'email', 'phone', 'address', 'notes', 'lastModified'],
+  Bookings:    ['id', 'customerId', 'property', 'checkIn', 'checkOut', 'nights', 'total', 'status', 'createdAt', 'eventType', 'guests', 'budget', 'specialRequests', 'lastModified'],
+  Supplies:    ['id', 'name', 'category', 'quantity', 'unit', 'unitCost', 'lastOrdered', 'supplier', 'minStock', 'lastModified'],
                             // Properties tab removed — single venue: "Pablo Paraiso Pool House" (hardcoded in Bookings)
   Config:      ['key', 'value'],
   WebBookings: ['id', 'timestamp', 'name', 'email', 'phone', 'eventType', 'date', 'timeSlot', 'guests', 'package', 'budget', 'duration', 'calendarEventId', 'specialRequests', 'status', 'details']
@@ -122,8 +122,42 @@ function getSheet(tabName) {
   if (!sheet) {
     sheet = spreadsheet.insertSheet(tabName);
     sheet.appendRow(HEADERS[tabName]);
+  } else {
+    /* Migration: ensure lastModified column exists on entity sheets */
+    ensureLastModifiedColumn(sheet, tabName);
   }
   return sheet;
+}
+
+/**
+ * Ensures the sheet has a 'lastModified' column. If missing, inserts it
+ * at the end and backfills existing rows with the createdAt value (for
+ * Bookings) or empty string (for other entities).
+ * This supports the offline-export / merge feature.
+ * @param {Sheet} sheet
+ * @param {string} tabName
+ */
+function ensureLastModifiedColumn(sheet, tabName) {
+  if (!HEADERS[tabName] || HEADERS[tabName].indexOf('lastModified') === -1) return;
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  if (headers.indexOf('lastModified') !== -1) return;
+
+  var newCol = headers.length + 1;
+  sheet.getRange(1, newCol).setValue('lastModified');
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    var backfillValues = [];
+    var createdAtIdx = headers.indexOf('createdAt');
+    for (var i = 2; i <= lastRow; i++) {
+      if (createdAtIdx !== -1) {
+        backfillValues.push([sheet.getRange(i, createdAtIdx + 1).getValue()]);
+      } else {
+        backfillValues.push([formatDate(new Date())]);
+      }
+    }
+    sheet.getRange(2, newCol, backfillValues.length, 1).setValues(backfillValues);
+  }
 }
 
 /**
@@ -361,6 +395,11 @@ function addRecord(tabName, data) {
     }
   }
 
+  // Set lastModified on all entity records (for merge conflict detection)
+  if (HEADERS[tabName] && HEADERS[tabName].indexOf('lastModified') !== -1) {
+    data.lastModified = formatDate(new Date());
+  }
+
   var row = recordToRow(data, headers);
   sheet.appendRow(row);
   return data;
@@ -405,6 +444,11 @@ function updateRecord(tabName, data) {
     }
   }
 
+  // Update lastModified on entity records (for merge conflict detection)
+  if (HEADERS[tabName] && HEADERS[tabName].indexOf('lastModified') !== -1) {
+    merged.lastModified = formatDate(new Date());
+  }
+
   // Ensure id is preserved
   merged.id = data.id || existing.id;
 
@@ -427,6 +471,132 @@ function deleteRecord(tabName, id) {
   }
   sheet.deleteRow(sheetRow);
   return { id: id };
+}
+
+/**
+ * Compares two lastModified timestamps. Returns:
+ *   1 if a is newer, -1 if b is newer, 0 if equal or both unknown.
+ */
+function compareLastModified(a, b) {
+  var ta = a ? new Date(a).getTime() : 0;
+  var tb = b ? new Date(b).getTime() : 0;
+  if (ta > tb) return 1;
+  if (tb > ta) return -1;
+  return 0;
+}
+
+/**
+ * Merges a locally-edited spreadsheet backup with the live online data.
+ * Strategy (Option A — additive + update-only, never delete):
+ *   - New local records (ID not online)  → insert with regenerated ID
+ *   - Updated local records (ID online, local lastModified newer) → update online
+ *   - Online-only records (new web bookings) → preserved untouched
+ *   - Conflicts (same ID, both changed, can't determine newer) → flagged
+ *   - Deletions are NEVER propagated (local deletes are ignored)
+ *
+ * @param {Object} payload - The JSON backup ({ data: { finances, customers, bookings, supplies } })
+ * @return {Object} Summary of merge actions
+ */
+function mergeSpreadsheet(payload) {
+  var results = {
+    added: 0,
+    updated: 0,
+    preserved: 0,
+    conflicts: [],
+    errors: [],
+    idMap: {},  // maps old local IDs to new online IDs for FK rewriting
+  };
+
+  /* Entity types to merge, in dependency order (Customers → Bookings → Finances) */
+  var entityTypes = [
+    { key: 'customers',   tab: 'Customers',   fk: null },
+    { key: 'bookings',    tab: 'Bookings',    fk: 'customerId' },
+    { key: 'finances',    tab: 'Finances',    fk: 'bookingId' },
+    { key: 'supplies',    tab: 'Supplies',    fk: null },
+  ];
+
+  if (!payload || !payload.data) {
+    throw new Error('Invalid payload: missing data object');
+  }
+
+  entityTypes.forEach(function(entity) {
+    var localRecords = payload.data[entity.key] || [];
+    var onlineRecords;
+    try {
+      onlineRecords = sheetToRecords(getSheet(entity.tab));
+    } catch (e) {
+      results.errors.push(entity.tab + ': ' + e.message);
+      return;
+    }
+
+    var onlineById = {};
+    onlineRecords.forEach(function(r) { onlineById[r.id] = r; });
+
+    localRecords.forEach(function(local) {
+      if (!local || !local.id) return;
+
+      /* Rewrite foreign-key IDs that were regenerated during merge */
+      if (entity.fk && local[entity.fk] && results.idMap[entity.fk + ':' + local[entity.fk]]) {
+        local[entity.fk] = results.idMap[entity.fk + ':' + local[entity.fk]];
+      }
+
+      var online = onlineById[local.id];
+      if (!online) {
+        /* New record locally — create it online (addRecord generates a new ID) */
+        var newRecord = {};
+        for (var key in local) {
+          if (key !== 'id' && key !== 'lastModified' && local.hasOwnProperty(key)) {
+            newRecord[key] = local[key];
+          }
+        }
+        try {
+          var created = addRecord(entity.tab, newRecord);
+          /* Track ID change so dependent records can be rewritten */
+          results.idMap[entity.tab + ':' + local.id] = created.id;
+          results.added++;
+        } catch (e) {
+          results.errors.push(entity.tab + ' ' + local.id + ': ' + e.message);
+        }
+      } else {
+        /* Record exists online — compare lastModified */
+        var cmp = compareLastModified(local.lastModified, online.lastModified);
+        if (cmp > 0) {
+          /* Local is newer — update online */
+          var updateData = { id: local.id };
+          for (var k in local) {
+            if (k !== 'id' && k !== 'lastModified' && local.hasOwnProperty(k)) {
+              updateData[k] = local[k];
+            }
+          }
+          try {
+            updateRecord(entity.tab, updateData);
+            results.updated++;
+          } catch (e) {
+            results.errors.push(entity.tab + ' ' + local.id + ': ' + e.message);
+          }
+        } else if (cmp === 0) {
+          /* Can't determine — flag as conflict, preserve online */
+          results.conflicts.push({
+            table: entity.tab,
+            id: local.id,
+            localModified: local.lastModified,
+            onlineModified: online.lastModified,
+          });
+        }
+        /* cmp < 0: online is newer, preserve online (do nothing) */
+        results.preserved++;
+      }
+    });
+  });
+
+  return {
+    success: true,
+    added: results.added,
+    updated: results.updated,
+    preserved: results.preserved,
+    conflicts: results.conflicts,
+    errors: results.errors,
+  };
 }
 
 
@@ -638,6 +808,7 @@ function doPost(e) {
       case 'addCalendarEvent':    result = addCalendarEvent(data); break;
       case 'updateCalendarEvent': result = updateCalendarEvent(data); break;
       case 'deleteCalendarEvent': result = deleteCalendarEvent(data); break;
+      case 'mergeSpreadsheet':    result = mergeSpreadsheet(data); break;
       default:
         return sendError('Unknown action: ' + action);
     }
@@ -758,6 +929,7 @@ function submitPublicBooking(e) {
       specialRequests: data.message || ""
     };
     var booking = addBooking(bookingData);
+    /* addBooking (via addRecord) sets lastModified automatically */
 
     /* ─── Create calendar event on the configured calendar ─── */
     var calendarEventId = null;
@@ -1314,49 +1486,50 @@ function seedDatabase() {
     spreadsheet.insertSheet('Finances');
   financesSheet.clear();
   financesSheet.appendRow(HEADERS.Finances);
-  financesSheet.appendRow(['F0001', '2024-01-15', 'income', 'Booking', 'Payment for B0001', 15000, 'B0001']);
-  financesSheet.appendRow(['F0002', '2024-01-20', 'expense', 'Supplies', 'Towels and linens', 2000, '']);
-  financesSheet.appendRow(['F0003', '2024-02-03', 'income', 'Booking', 'Payment for B0002', 25000, 'B0002']);
-  financesSheet.appendRow(['F0004', '2024-02-10', 'expense', 'Cleaning', 'Weekly cleaning service', 1500, '']);
-  financesSheet.appendRow(['F0005', '2024-02-15', 'income', 'Booking', 'Payment for B0003', 30000, 'B0003']);
-  financesSheet.appendRow(['F0006', '2024-02-20', 'expense', 'Utilities', 'Electricity and water', 3500, '']);
-  financesSheet.appendRow(['F0007', '2024-03-01', 'income', 'Booking', 'Payment for B0004', 20000, 'B0004']);
-  financesSheet.appendRow(['F0008', '2024-03-05', 'expense', 'Maintenance', 'Pool repair', 5000, '']);
-  financesSheet.appendRow(['F0009', '2024-03-12', 'income', 'Booking', 'Payment for B0005', 35000, 'B0005']);
-  financesSheet.appendRow(['F0010', '2024-03-18', 'expense', 'Supplies', 'Toiletries restock', 2500, '']);
+  var now = formatDate(new Date());
+  financesSheet.appendRow(['F0001', '2024-01-15', 'income', 'Booking', 'Payment for B0001', 15000, 'B0001', now]);
+  financesSheet.appendRow(['F0002', '2024-01-20', 'expense', 'Supplies', 'Towels and linens', 2000, '', now]);
+  financesSheet.appendRow(['F0003', '2024-02-03', 'income', 'Booking', 'Payment for B0002', 25000, 'B0002', now]);
+  financesSheet.appendRow(['F0004', '2024-02-10', 'expense', 'Cleaning', 'Weekly cleaning service', 1500, '', now]);
+  financesSheet.appendRow(['F0005', '2024-02-15', 'income', 'Booking', 'Payment for B0003', 30000, 'B0003', now]);
+  financesSheet.appendRow(['F0006', '2024-02-20', 'expense', 'Utilities', 'Electricity and water', 3500, '', now]);
+  financesSheet.appendRow(['F0007', '2024-03-01', 'income', 'Booking', 'Payment for B0004', 20000, 'B0004', now]);
+  financesSheet.appendRow(['F0008', '2024-03-05', 'expense', 'Maintenance', 'Pool repair', 5000, '', now]);
+  financesSheet.appendRow(['F0009', '2024-03-12', 'income', 'Booking', 'Payment for B0005', 35000, 'B0005', now]);
+  financesSheet.appendRow(['F0010', '2024-03-18', 'expense', 'Supplies', 'Toiletries restock', 2500, '', now]);
 
   // --- Customers ---
   var customersSheet = spreadsheet.getSheetByName('Customers') ||
     spreadsheet.insertSheet('Customers');
   customersSheet.clear();
   customersSheet.appendRow(HEADERS.Customers);
-  customersSheet.appendRow(['C0001', 'John Smith', 'john@example.com', '+123****7890', '123 Main St', 'VIP']);
-  customersSheet.appendRow(['C0002', 'Jane Doe', 'jane@example.com', '+198****4321', '456 Oak Ave', '']);
-  customersSheet.appendRow(['C0003', 'Maria Santos', 'maria@example.com', '+639****1234', 'Mandaluyong City', 'Repeat']);
-  customersSheet.appendRow(['C0004', 'Carlos Reyes', 'carlos@example.com', '+639****5678', 'Makati City', '']);
-  customersSheet.appendRow(['C0005', 'Anna Petrov', 'anna@example.com', '+141****9012', '123 Lake View', 'VIP']);
+  customersSheet.appendRow(['C0001', 'John Smith', 'john@example.com', '+123****7890', '123 Main St', 'VIP', now]);
+  customersSheet.appendRow(['C0002', 'Jane Doe', 'jane@example.com', '+198****4321', '456 Oak Ave', '', now]);
+  customersSheet.appendRow(['C0003', 'Maria Santos', 'maria@example.com', '+639****1234', 'Mandaluyong City', 'Repeat', now]);
+  customersSheet.appendRow(['C0004', 'Carlos Reyes', 'carlos@example.com', '+639****5678', 'Makati City', '', now]);
+  customersSheet.appendRow(['C0005', 'Anna Petrov', 'anna@example.com', '+141****9012', '123 Lake View', 'VIP', now]);
 
   // --- Bookings (with extra columns for website bookings: eventType, guests, budget, specialRequests) ---
   var bookingsSheet = spreadsheet.getSheetByName('Bookings') ||
     spreadsheet.insertSheet('Bookings');
   bookingsSheet.clear();
   bookingsSheet.appendRow(HEADERS.Bookings);
-  bookingsSheet.appendRow(['B0001', 'C0001', 'Pablo Paraiso Pool House', '2024-01-20', '2024-01-25', 5, 15000, 'confirmed', '2024-01-01', 'Pool Party', 20, '', '']);
-  bookingsSheet.appendRow(['B0002', 'C0002', 'Pablo Paraiso Pool House', '2024-02-10', '2024-02-14', 4, 10000, 'confirmed', '2024-01-15', 'Birthday Celebration', 15, '', '']);
-  bookingsSheet.appendRow(['B0003', 'C0003', 'Pablo Paraiso Pool House', '2024-02-20', '2024-02-27', 7, 28000, 'confirmed', '2024-02-01', 'Family Gathering', 30, '', '']);
-  bookingsSheet.appendRow(['B0004', 'C0004', 'Pablo Paraiso Pool House', '2024-03-05', '2024-03-08', 3, 7500, 'pending', '2024-02-20', 'Team Building', 12, '', '']);
-  bookingsSheet.appendRow(['B0005', 'C0005', 'Pablo Paraiso Pool House', '2024-03-15', '2024-03-22', 7, 35000, 'confirmed', '2024-03-01', 'Pool Party', 25, '', '']);
+  bookingsSheet.appendRow(['B0001', 'C0001', 'Pablo Paraiso Pool House', '2024-01-20', '2024-01-25', 5, 15000, 'confirmed', '2024-01-01', 'Pool Party', 20, '', '', now]);
+  bookingsSheet.appendRow(['B0002', 'C0002', 'Pablo Paraiso Pool House', '2024-02-10', '2024-02-14', 4, 10000, 'confirmed', '2024-01-15', 'Birthday Celebration', 15, '', '', now]);
+  bookingsSheet.appendRow(['B0003', 'C0003', 'Pablo Paraiso Pool House', '2024-02-20', '2024-02-27', 7, 28000, 'confirmed', '2024-02-01', 'Family Gathering', 30, '', '', now]);
+  bookingsSheet.appendRow(['B0004', 'C0004', 'Pablo Paraiso Pool House', '2024-03-05', '2024-03-08', 3, 7500, 'pending', '2024-02-20', 'Team Building', 12, '', '', now]);
+  bookingsSheet.appendRow(['B0005', 'C0005', 'Pablo Paraiso Pool House', '2024-03-15', '2024-03-22', 7, 35000, 'confirmed', '2024-03-01', 'Pool Party', 25, '', '', now]);
 
   // --- Supplies ---
   var suppliesSheet = spreadsheet.getSheetByName('Supplies') ||
     spreadsheet.insertSheet('Supplies');
   suppliesSheet.clear();
   suppliesSheet.appendRow(HEADERS.Supplies);
-  suppliesSheet.appendRow(['S0001', 'Towels', 'Linens', 20, 'pieces', 500, '2024-01-01', 'ABC Supplier', 10]);
-  suppliesSheet.appendRow(['S0002', 'Toilet Paper', 'Essentials', 50, 'rolls', 200, '2024-01-10', 'ABC Supplier', 20]);
-  suppliesSheet.appendRow(['S0003', 'Shampoo', 'Bathroom', 5, 'bottles', 300, '2024-02-01', 'CleanCo', 8]);
-  suppliesSheet.appendRow(['S0004', 'Coffee Beans', 'Kitchen', 2, 'kg', 800, '2024-02-15', 'Roastery', 3]);
-  suppliesSheet.appendRow(['S0005', 'Bed Sheets', 'Linens', 12, 'sets', 1200, '2024-01-20', 'ABC Supplier', 6]);
+  suppliesSheet.appendRow(['S0001', 'Towels', 'Linens', 20, 'pieces', 500, '2024-01-01', 'ABC Supplier', 10, now]);
+  suppliesSheet.appendRow(['S0002', 'Toilet Paper', 'Essentials', 50, 'rolls', 200, '2024-01-10', 'ABC Supplier', 20, now]);
+  suppliesSheet.appendRow(['S0003', 'Shampoo', 'Bathroom', 5, 'bottles', 300, '2024-02-01', 'CleanCo', 8, now]);
+  suppliesSheet.appendRow(['S0004', 'Coffee Beans', 'Kitchen', 2, 'kg', 800, '2024-02-15', 'Roastery', 3, now]);
+  suppliesSheet.appendRow(['S0005', 'Bed Sheets', 'Linens', 12, 'sets', 1200, '2024-01-20', 'ABC Supplier', 6, now]);
 
   // --- Properties — removed: single venue (Pablo Paraiso Pool House) ---
   // The Properties sheet is no longer used. Bookings hardcode the property

@@ -63,9 +63,9 @@ export function createBookings(_args, ref) {
   container.addEventListener("click", (e) => {
     const th = e.target.closest("th.sortable");
     if (!th) return;
-    const col = COLUMNS.find((c) => c.label === th.dataset.col);
+    const col = COLUMNS.find((c) => c.key === th.dataset.col);
     if (!col) return;
-    sortState = toggleSort(sortState, col.label);
+    sortState = toggleSort(sortState, col.key);
     renderTable();
   });
 
@@ -121,8 +121,8 @@ function renderTable() {
   const thead = document.createElement("thead");
   const headerRow = document.createElement("tr");
   cols.forEach((col) => {
-    const th = sortableHeader(col.label, sortState, col.label);
-    th.dataset.col = col.label;
+    const th = sortableHeader(col.label, sortState, col.key);
+    th.dataset.col = col.key;
     headerRow.appendChild(th);
   });
   const actionsTh = document.createElement("th");

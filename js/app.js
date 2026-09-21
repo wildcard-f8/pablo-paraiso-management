@@ -10,7 +10,7 @@ import { createCustomers } from "./customers.js?v=9";
 import { createBookings } from "./bookings.js?v=9";
 import { createCalendar } from "./calendar.js?v=9";
 import { createSupplies } from "./supplies.js?v=9";
-import { exportSpreadsheet } from "./export.js?v=9";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=9";
 
 
 let currentParams = {};
@@ -33,6 +33,7 @@ const app = {
     /* Register navigation listeners FIRST — they must survive any
        downstream error so the sidebar / back-button still work. */
     window.addEventListener("hashchange", () => this.parseHash());
+    window.addEventListener("refreshData", () => this.refreshCurrentPage());
     window.addEventListener("load", () => {
       isFirstLoad = false;
       /* Only welcome + seed when the user is authenticated */
@@ -75,6 +76,14 @@ const app = {
     if (exportBtn) {
       exportBtn.addEventListener("click", () => {
         app.exportData();
+      });
+    }
+
+    /* Import (merge) button — uploads a local JSON backup to merge with online data */
+    const importBtn = $("#importBtn");
+    if (importBtn) {
+      importBtn.addEventListener("click", () => {
+        app.importData();
       });
     }
   },
@@ -237,6 +246,21 @@ const app = {
     }
   },
 
+  refreshCurrentPage() {
+    const page = currentParams.page;
+    if (page === "dashboard" && typeof window.refreshDashboard === "function") {
+      window.refreshDashboard();
+    } else if (page === "finances" && typeof window.refreshFinances === "function") {
+      window.refreshFinances();
+    } else if (page === "bookings" && typeof window.refreshBookings === "function") {
+      window.refreshBookings();
+    } else if (page === "customers" && typeof window.refreshCustomers === "function") {
+      window.refreshCustomers();
+    } else if (page === "supplies" && typeof window.refreshSupplies === "function") {
+      window.refreshSupplies();
+    }
+  },
+
   updateNav(activePage) {
     $$("a[data-page]").forEach((link) => {
       const page = link.dataset.page;
@@ -283,6 +307,64 @@ const app = {
       this.showToast("Export failed: " + (err.message || "Unknown error"), "error", 5000);
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = "💾 Export"; }
+    }
+  },
+
+  /* ── Offline import / merge ── */
+  async importData() {
+    const btn = $("#importBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "⏳ Importing…"; }
+
+    /* Create a hidden file input on demand */
+    let fileInput = $("#importFileInput");
+    if (!fileInput) {
+      fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.id = "importFileInput";
+      fileInput.accept = ".json,application/json";
+      fileInput.style.display = "none";
+      document.body.appendChild(fileInput);
+    }
+
+    const file = await new Promise((resolve) => {
+      fileInput.onchange = () => resolve(fileInput.files[0]);
+      fileInput.click();
+    });
+
+    if (!file) {
+      if (btn) { btn.disabled = false; btn.textContent = "⬆ Import"; }
+      return;
+    }
+
+    try {
+      const result = await importSpreadsheet(file, (msg) => {
+        this.showToast(msg, "info", 5000);
+      });
+
+      let summary = `Merged: ${result.added} added, ${result.updated} updated, ${result.preserved} preserved.`;
+      if (result.conflicts.length > 0 || result.errors.length > 0) {
+        summary += ` ${result.conflicts.length} conflict(s), ${result.errors.length} error(s).`;
+      }
+      this.showToast(summary, "info", 8000);
+
+      /* If there were conflicts, show details */
+      if (result.conflicts.length > 0) {
+        setTimeout(() => {
+          const detail = result.conflicts.map(c =>
+            `${c.table} ${c.id}: local "${c.localModified}" vs online "${c.onlineModified}"`
+          ).join("\n");
+          this.showToast("Conflicts (online version kept): " + detail, "info", 10000);
+        }, 1000);
+      }
+
+      /* Refresh current view data */
+      const event = new CustomEvent("refreshData");
+      window.dispatchEvent(event);
+    } catch (err) {
+      this.showToast("Import failed: " + (err.message || "Unknown error"), "error", 5000);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "⬆ Import"; }
+      fileInput.value = "";
     }
   },
 

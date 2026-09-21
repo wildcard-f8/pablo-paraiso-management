@@ -6,6 +6,7 @@ import { api } from "./auth.js?v=9";
 import { utils } from "./utils.js?v=9";
 import { refreshDashboard } from "./dashboard.js?v=9";
 import { CONFIG } from "./config.js?v=9";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=9";
 
 let tableEl = null;
 let appRef = null;
@@ -13,10 +14,17 @@ let chart = null;
 let data = [];
 let filtered = [];
 let filterType = "all";
+let sortState = null;
 
-function buildColumns() {
-  return ["Date", "Type", "Category", "Description", "Amount", "Booking ID"];
-}
+/* Column definitions with key/label/type for sorting */
+const COLUMNS = [
+  { key: "date", type: "date" },
+  { key: "type", type: "string" },
+  { key: "category", type: "string" },
+  { key: "description", type: "string" },
+  { key: "amount", type: "number" },
+  { key: "bookingId", type: "string" },
+];
 
 function rowActionHandlers(row) {
   const edit = `<button class="btn btn--sm btn--icon" title="Edit" onclick="appEditFinance('${row.id}')">✏</button>`;
@@ -57,6 +65,18 @@ export function createFinances(_args, ref) {
     applySearch(e.target.value);
   });
 
+  /* Sortable column headers */
+  if (tableEl) {
+    tableEl.addEventListener("click", (e) => {
+      const th = e.target.closest("th.sortable");
+      if (!th) return;
+      const col = COLUMNS.find((c) => c.key === th.dataset.col);
+      if (!col) return;
+      sortState = toggleSort(sortState, col.key);
+      renderTable();
+    });
+  }
+
   loadFinances().catch((err) => appRef.showToast(`Load failed: ${err.message}`, "error"));
 
   const unmount = function unmount() {
@@ -68,7 +88,6 @@ export function createFinances(_args, ref) {
 
 async function loadFinances() {
   data = await api.get("getFinances");
-  data = data.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   filtered = [...data];
   renderTable();
   renderChart();
@@ -87,23 +106,36 @@ function applySearch(q) {
 
 function renderTable() {
   if (!tableEl) return;
-  const cols = buildColumns();
-  // map rows to column keys
-  const rows = filtered.map((f) => ({
+  const cols = COLUMNS;
+  const sorted = applySort(filtered, cols, sortState);
+
+  const rows = sorted.map((f) => ({
     id: f.id,
-    Date: utils.formatDate(f.date),
-    Type: utils.moneyPill(f.type),
-    Category: utils.escapeHTML(f.category || ""),
-    Description: utils.escapeHTML(f.description || ""),
-    Amount: utils.formatCurrency(f.amount),
-    "Booking ID": utils.escapeHTML(f.bookingId || ""),
+    date: utils.formatDate(f.date),
+    type: utils.moneyPill(f.type),
+    category: utils.escapeHTML(f.category || ""),
+    description: utils.escapeHTML(f.description || ""),
+    amount: utils.formatCurrency(f.amount),
+    bookingId: utils.escapeHTML(f.bookingId || ""),
   }));
-  // Build a proper table via utils.buildTable
+
   const t = document.createElement("table");
   t.className = "table";
-  t.innerHTML =
-    `<thead><tr>${cols.map((c) => `<th>${c}</th>`).join("")}<th>Actions</th></tr></thead><tbody></tbody>`;
-  const tbody = t.querySelector("tbody");
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  cols.forEach((col) => {
+    const label = { date: "Date", type: "Type", category: "Category", description: "Description", amount: "Amount", bookingId: "Booking ID" }[col.key] || col.key;
+    const th = sortableHeader(label, sortState, col.key);
+    th.dataset.col = col.key;
+    headerRow.appendChild(th);
+  });
+  const actionsTh = document.createElement("th");
+  actionsTh.textContent = "Actions";
+  headerRow.appendChild(actionsTh);
+  thead.appendChild(headerRow);
+  t.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
   if (!rows.length) {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td colspan="${cols.length + 1}" class="empty-msg">No finance records match your filter.</td>`;
@@ -112,11 +144,20 @@ function renderTable() {
   rows.forEach((row) => {
     const tr = document.createElement("tr");
     tr.dataset.id = row.id;
-    tr.innerHTML =
-      `<td>${row.Date}</td><td>${row.Type}</td><td>${row.Category}</td><td>${row.Description}</td><td>${row.Amount}</td><td>${row["Booking ID"]}</td>` +
-      `<td class="row-actions">` + rowActionHandlers({ id: row.id }) + `</td>`;
+    const cells = cols.map((col) => {
+      const td = document.createElement("td");
+      td.innerHTML = row[col.key];
+      return td;
+    });
+    const actionsTd = document.createElement("td");
+    actionsTd.className = "row-actions";
+    actionsTd.innerHTML = rowActionHandlers({ id: row.id });
+    cells.push(actionsTd);
+    cells.forEach((td) => tr.appendChild(td));
     tbody.appendChild(tr);
   });
+  t.appendChild(tbody);
+
   tableEl.innerHTML = "";
   tableEl.appendChild(t);
 }
