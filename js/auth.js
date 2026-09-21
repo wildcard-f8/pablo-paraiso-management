@@ -232,7 +232,8 @@ export const api = {
       addFinance: "getFinances", updateFinance: "getFinances", deleteFinance: "getFinances",
       addBooking: "getBookings", updateBooking: "getBookings", deleteBooking: "getBookings",
       addSupply: "getSupplies", updateSupply: "getSupplies", deleteSupply: "getSupplies",
-      updateWebsiteContent: "getWebsiteContent" };
+      updateWebsiteContent: "getWebsiteContent",
+      uploadImage: "getWebsiteContent" };
     if (singular[action]) invalidateCache(singular[action]);
     return result;
   },

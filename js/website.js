@@ -579,9 +579,9 @@ function handleImageUpload(targetInput, uploadBtn) {
     if (!file) return;
 
     // Size guard — keep under GAS 50MB POST limit
-    var MAX_BYTES = 45 * 1024 * 1024; // 45 MB
+    var MAX_BYTES = 30 * 1024 * 1024; // 30 MB (base64 inflates ~33%, GAS limit ~50MB)
     if (file.size > MAX_BYTES) {
-      app.showToast("Image too large (max 45 MB). Please resize.", "error", 4000);
+      app.showToast("Image too large (max 30 MB). Please resize.", "error", 4000);
       return;
     }
 
