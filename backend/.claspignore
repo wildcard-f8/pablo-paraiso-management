@@ -1,0 +1,5 @@
+# .claspignore — exclude everything except code.gs
+*
+!code.gs
+!README.md
+!CLASP.md

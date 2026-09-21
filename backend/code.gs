@@ -636,6 +636,60 @@ function setAuthorizedUsers() {
 }
 
 /**
+ * Returns the current authorized users list (for admin/management API use).
+ * @return {{authorizedUsers: Array<string>, count: number}}
+ */
+function getAuthStatus() {
+  return {
+    authorizedUsers: getAuthorizedUsers(),
+    count: getAuthorizedUsers().length
+  };
+}
+
+/**
+ * Adds an email to the authorized users list via API.
+ * @param {Object} data - { email: "user@example.com" }
+ * @return {Object} { email, added|alreadyInList, users }
+ */
+function addAuthorizedUser(data) {
+  if (!data || !data.email) {
+    throw new Error("email is required");
+  }
+  var users = getAuthorizedUsers();
+  var email = data.email.trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    throw new Error("Invalid email format: " + email);
+  }
+  if (users.includes(email)) {
+    return { email: email, alreadyInList: true, users: users };
+  }
+  users.push(email);
+  PropertiesService.getScriptProperties().setProperty('AUTHORIZED_USERS', users.join(','));
+  Logger.log('Authorized users updated (added): ' + users.join(', '));
+  return { email: email, added: true, users: users };
+}
+
+/**
+ * Removes an email from the authorized users list via API.
+ * @param {Object} data - { email: "user@example.com" }
+ * @return {Object} { email, removed|notInList, users }
+ */
+function removeAuthorizedUser(data) {
+  if (!data || !data.email) {
+    throw new Error("email is required");
+  }
+  var users = getAuthorizedUsers();
+  var email = data.email.trim().toLowerCase();
+  var filtered = users.filter(function(e) { return e !== email; });
+  if (filtered.length === users.length) {
+    return { email: email, notInList: true, users: users };
+  }
+  PropertiesService.getScriptProperties().setProperty('AUTHORIZED_USERS', filtered.join(','));
+  Logger.log('Authorized users updated (removed): ' + filtered.join(', '));
+  return { email: email, removed: true, users: filtered };
+}
+
+/**
  * Sets the CALENDAR_ID script property so the management app and website
  * bookings use a dedicated calendar instead of the script owner's default.
  * Run from the Apps Script editor — edit the calendar ID below first,
@@ -737,8 +791,9 @@ function doGet(e) {
       case 'getFinances':       result = getFinances(); break;
       case 'getCustomers':      result = getCustomers(); break;
       case 'getBookings':       result = getBookings(); break;
-      case 'getSupplies':     result = getSupplies(); break;
+      case 'getSupplies':       result = getSupplies(); break;
       case 'getCalendarEvents': result = getCalendarEvents(e.parameter.start, e.parameter.end); break;
+      case 'getAuthStatus':     result = getAuthStatus(); break;
       default:
         return sendError('Unknown action: ' + action);
     }
@@ -809,6 +864,8 @@ function doPost(e) {
       case 'updateCalendarEvent': result = updateCalendarEvent(data); break;
       case 'deleteCalendarEvent': result = deleteCalendarEvent(data); break;
       case 'mergeSpreadsheet':    result = mergeSpreadsheet(data); break;
+      case 'addAuthorizedUser':   result = addAuthorizedUser(data); break;
+      case 'removeAuthorizedUser':result = removeAuthorizedUser(data); break;
       default:
         return sendError('Unknown action: ' + action);
     }
