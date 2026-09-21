@@ -1805,3 +1805,85 @@ function seedDatabase() {
       : 'Sheet already existed. Seeded all sheets with headers and sample data.'
   };
 }
+
+/**
+ * Seeds website content keys into the Config sheet (idempotent — only
+ * inserts keys that don't already exist). Run from the Apps Script editor
+ * (▶ Run) if the Config sheet is missing website_* keys.
+ */
+function seedWebsiteContent() {
+  var sheet = getSheet('Config');
+  var allData = sheet.getDataRange().getValues();
+  var headers = allData.length > 0 ? allData[0] : ['key', 'value'];
+  var keyIdx = headers.indexOf('key');
+  var valIdx = headers.indexOf('value');
+  if (keyIdx === -1 || valIdx === -1) throw new Error('Config sheet missing key/value columns');
+
+  var existingKeys = {};
+  for (var r = 1; r < allData.length; r++) {
+    existingKeys[String(allData[r][keyIdx] || '').trim()] = true;
+  }
+
+  var websiteContent = [
+    ['website_logo', 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/logo_transparent.png?v=2'],
+    ['website_hero_title', 'Your Lakeside Paradise'],
+    ['website_hero_subtitle', 'Pablo Paraiso is a luxury pool house retreat nestled along the serene shores of Laguna de Bay.'],
+    ['website_hero_cta', 'Book Your Retreat'],
+    ['website_hero_cta_link', '#contact'],
+    ['website_about_title', 'Your Summer Escape Awaits'],
+    ['website_about_subtitle', 'PABLO PARAISO'],
+    ['website_about_description_1', 'A luxury lakeside pool house designed for celebration, connection, and pure relaxation.'],
+    ['website_about_description_2', "Named after the Spanish phrase for \"Paul's Paradise,\" Pablo Paraiso is a serene lakeside retreat where unforgettable moments are made."],
+    ['website_about_image', 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/lounge.jpg'],
+    ['website_hero_features', JSON.stringify([
+      { title: 'Prime Location', desc: 'Just 30 minutes from Manila, nestled along the scenic shores of Laguna de Bay.' },
+      { title: 'Pool & Villa', desc: 'Swimming pool (3ft-5ft depth) with a one-room villa featuring a private toilet and bathroom.' },
+      { title: 'All Amenities', desc: 'Two shower rooms, dining tables, grill, videoke, and lush garden grounds.' },
+      { title: 'Flexible Pricing', desc: '6-hour and 10-hour packages starting at Php 4,000, plus custom event options.' }
+    ])],
+    ['website_amenities', JSON.stringify([
+      { title: 'Pool', desc: 'Swimming pool with depths ranging from 3ft to 5ft.' },
+      { title: 'Villa', desc: 'One-room villa with a private toilet and bathroom.' },
+      { title: 'Shower Rooms', desc: 'Two clean, well-maintained shower facilities with hot and cold water.' },
+      { title: 'Tables', desc: 'Outdoor dining tables seating up to 30 guests.' },
+      { title: 'Grill', desc: 'Charcoal and gas grill stations for community barbecues.' },
+      { title: 'Videoke', desc: 'Entertainment system with a selection of songs.' },
+      { title: 'Garden', desc: 'Lush garden grounds perfect for relaxation and photos.' },
+      { title: 'Mini-Golf', desc: 'Putting green and mini-golf course for casual sports.' }
+    ])],
+    ['website_gallery', JSON.stringify([
+      { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/gallery-3.jpg', alt: 'Mountain lake sunset view' },
+      { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/gallery-1.jpg', alt: 'Luxury resort pool with palm trees' },
+      { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/sunset-lake.jpg', alt: 'Aerial view of lake with mountains' },
+      { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/gallery-4.jpg', alt: 'Lake at sunset with trees' },
+      { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/gallery-2.jpg', alt: 'Pool with lounge chair and umbrella' },
+      { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/barbecue.jpg', alt: 'Group of people around a grill' },
+      { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/pool-party.jpg', alt: 'Lounge chairs by the pool' },
+      { src: 'https://wildcard-f8.github.io/pablo-paraiso/assets/img/team-building.jpg', alt: 'Pool next to lush green hillside' }
+    ])],
+    ['website_packages', JSON.stringify([
+      { name: '6-Hour Package', price: '\u20B14,000', duration: '6 hours', guests: 'Up to 30 guests', features: ['Full pool & villa access', 'Shower rooms & tables', 'Grill & videoke', 'Garden grounds', 'Mini-golf course access'] },
+      { name: '10-Hour Package', price: '\u20B16,000', duration: '10 hours', guests: 'Up to 30 guests', features: ['Full pool & villa access', 'Shower rooms & tables', 'Grill & videoke', 'Garden grounds', 'Mini-golf course access', '4 extra hours for just Php 2,000 more'] },
+      { name: 'Custom Event', price: 'Custom', duration: 'Flexible', guests: 'Up to 30 guests', features: ['Flexible duration', 'Custom menu options', 'Special arrangements', 'Dedicated coordination', 'Mini-golf course access'] }
+    ])],
+    ['website_testimonials', JSON.stringify([
+      { quote: 'Our company event was absolutely magical. The pool, the food, the atmosphere — everything was perfect!', guest: 'Sarah M.' },
+      { quote: 'We celebrated my 30th birthday here and it was incredible! The pool area, the grill stations, and the overall vibe made it unforgettable.', guest: 'Alex R.' }
+    ])],
+    ['website_contact_email', 'hello@pabloparaiso.ph'],
+    ['website_contact_phone', '+63 917 123 4567'],
+    ['website_contact_address', 'Along the scenic shores of Laguna de Bay, Philippines']
+  ];
+
+  var added = 0;
+  websiteContent.forEach(function(row) {
+    var k = row[0];
+    if (!existingKeys[k]) {
+      sheet.appendRow(row);
+      existingKeys[k] = true;
+      added++;
+    }
+  });
+
+  return { success: true, added: added, message: 'Added ' + added + ' website content keys to Config sheet.' };
+}
