@@ -165,6 +165,7 @@ function renderCharts(finances, bookings, supplies, customers) {
       responsive: true,
       maintainAspectRatio: false,
       color: C.text,
+      layout: { padding: { top: 4, bottom: 8, left: 0, right: 8 } },
       plugins: {
         legend: { display: false },
         tooltip: {

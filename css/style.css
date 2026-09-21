@@ -546,10 +546,12 @@ p { margin: 0 0 var(--space-3); }
   grid-template-columns: 1fr 1fr;
   gap: var(--space-4);
   margin-bottom: var(--space-6);
+  grid-auto-rows: 340px;
 }
-.chart-card { padding: var(--space-5); }
+.chart-card { padding: var(--space-5); display: flex; flex-direction: column; }
+.chart-card h3 { margin-bottom: var(--space-3); flex-shrink: 0; }
 .chart-card--full { grid-column: 1 / -1; }
-.chart-card canvas { min-height: 200px; }
+.chart-card canvas { min-height: 180px; height: auto !important; width: 100%; flex: 1; }
 @media (max-width: 768px) {
   .charts-grid { grid-template-columns: 1fr; }
 }
