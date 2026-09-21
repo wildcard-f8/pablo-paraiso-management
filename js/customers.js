@@ -24,7 +24,7 @@ export function createCustomers(_args, ref) {
       <button class="btn btn--primary btn--sm" onclick="appAddCustomer()">＋ Add Customer</button>
     </div>
     <div class="card">
-      <div id="customerTable" style="overflow:auto"></div>
+      <div id="customerTable" class="table-scroll"></div>
     </div>
   `;
   container = section.querySelector("#customerTable");

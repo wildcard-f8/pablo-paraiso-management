@@ -31,7 +31,7 @@ export function createSupplies(_args, ref) {
     </div>
 
     <div class="card">
-      <div id="supplyTable" style="overflow:auto"></div>
+      <div id="supplyTable" class="table-scroll"></div>
     </div>
   `;
   container = section.querySelector("#supplyTable");

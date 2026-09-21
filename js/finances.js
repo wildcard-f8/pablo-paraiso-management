@@ -41,7 +41,7 @@ export function createFinances(_args, ref) {
       <button class="btn btn--primary btn--sm" onclick="appAddFinance()">＋ Add Finance</button>
     </div>
     <div class="card">
-      <div id="tableContainer" style="overflow:auto"></div>
+      <div id="tableContainer" class="table-scroll"></div>
     </div>
     <div class="card chart-card">
       <h3>Income vs Expenses by Category</h3>

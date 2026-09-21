@@ -424,8 +424,13 @@ p { margin: 0 0 var(--space-3); }
 }
 
 /* ── Tables ── */
-.table-wrap {
+/* Scrollable table container — uses overflow-x only so the page handles
+   vertical scroll. scrollbar-gutter: stable prevents layout shift when
+   the horizontal scrollbar appears (which previously caused the last
+   column — Actions — to offset between header and body). */
+.table-scroll, .table-wrap {
   overflow-x: auto;
+  scrollbar-gutter: stable both-edges;
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
 }
@@ -439,6 +444,17 @@ p { margin: 0 0 var(--space-3); }
   padding: 0.6rem 0.85rem;
   text-align: left;
   border-bottom: 1px solid var(--color-border);
+}
+.table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--transition);
+}
+.table th.sortable:hover {
+  background: var(--color-surface-2);
+}
+.table th.sortable.active {
+  color: var(--color-primary);
 }
 .table th {
   background: var(--color-surface-2);

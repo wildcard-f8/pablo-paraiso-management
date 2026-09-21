@@ -7,8 +7,18 @@ import { api } from "./auth.js?v=9";
 import { utils } from "./utils.js?v=9";
 import { refreshDashboard } from "./dashboard.js?v=9";
 import { CONFIG } from "./config.js?v=9";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=9";
 
 const PROPERTY_NAME = "Pablo Paraiso Pool House";
+
+const COLUMNS = [
+  { key: "customer", label: "Customer", type: "string" },
+  { key: "checkIn", label: "Check In", type: "date" },
+  { key: "checkOut", label: "Check Out", type: "date" },
+  { key: "nights", label: "Nights", type: "number" },
+  { key: "total", label: "Total", type: "number" },
+  { key: "status", label: "Status", type: "string" },
+];
 
 let container = null;
 let appRef = null;
@@ -16,10 +26,7 @@ let data = [];
 let customers = {};
 let searchTerm = "";
 let statusFilter = "all";
-
-function buildColumns() {
-  return ["Customer", "Property", "Check In", "Check Out", "Nights", "Total", "Status"];
-}
+let sortState = null;
 
 export function createBookings(_args, ref) {
   appRef = ref;
@@ -39,7 +46,7 @@ export function createBookings(_args, ref) {
       <button class="btn btn--primary btn--sm" onclick="appAddBooking()">＋ Add Booking</button>
     </div>
     <div class="card">
-      <div id="bookingTable" style="overflow:auto"></div>
+      <div id="bookingTable" class="table-scroll"></div>
     </div>
   `;
   container = section.querySelector("#bookingTable");
@@ -49,6 +56,16 @@ export function createBookings(_args, ref) {
   });
   section.querySelector("#bookingStatusFilter").addEventListener("change", () => {
     statusFilter = section.querySelector("#bookingStatusFilter").value;
+    renderTable();
+  });
+
+  /* Sortable column headers */
+  container.addEventListener("click", (e) => {
+    const th = e.target.closest("th.sortable");
+    if (!th) return;
+    const col = COLUMNS.find((c) => c.label === th.dataset.col);
+    if (!col) return;
+    sortState = toggleSort(sortState, col.label);
     renderTable();
   });
 
@@ -66,8 +83,6 @@ async function loadBookings() {
   ]);
   data = bk;
   customers = Object.fromEntries(cust.map((c) => [c.id, c]));
-  const byDate = (b) => (b.checkIn || "");
-  data.sort((a, b) => byDate(b).localeCompare(byDate(a)));
   renderTable();
 }
 
@@ -77,32 +92,46 @@ function customerName(id) {
 
 function renderTable() {
   if (!container) return;
-  const cols = buildColumns();
+  const cols = COLUMNS;
   const term = searchTerm.toLowerCase();
-  const rows = data
+  const filtered = data
     .filter((b) => {
       const matches =
         (customerName(b.customerId) || "").toLowerCase().includes(term) ||
-        (b.property || "").toLowerCase().includes(term);
+        (b.property || "").toLowerCase().includes(term) ||
+        String(b.status || "").toLowerCase().includes(term);
       const statusOk = statusFilter === "all" || (b.status || "") === statusFilter;
       return matches && statusOk;
-    })
-    .map((b) => ({
-      id: b.id,
-      Customer: utils.escapeHTML(customerName(b.customerId)),
-      Property: utils.escapeHTML(b.property || ""),
-      "Check In": utils.formatDate(b.checkIn),
-      "Check Out": utils.formatDate(b.checkOut),
-      Nights: b.nights ?? "",
-      Total: utils.formatCurrency(b.total),
-      Status: utils.statusPill(b.status),
-    }));
+    });
+
+  const sorted = applySort(filtered, cols, sortState);
+
+  const rows = sorted.map((b) => ({
+    id: b.id,
+    customer: customerName(b.customerId),
+    checkIn: b.checkIn || "",
+    checkOut: b.checkOut || "",
+    nights: b.nights ?? "",
+    total: Number(b.total || 0),
+    status: b.status || "",
+  }));
 
   const t = document.createElement("table");
   t.className = "table";
-  t.innerHTML =
-    `<thead><tr>${cols.map((c) => `<th>${c}</th>`).join("")}<th>Actions</th></tr></thead><tbody></tbody>`;
-  const tbody = t.querySelector("tbody");
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  cols.forEach((col) => {
+    const th = sortableHeader(col.label, sortState, col.label);
+    th.dataset.col = col.label;
+    headerRow.appendChild(th);
+  });
+  const actionsTh = document.createElement("th");
+  actionsTh.textContent = "Actions";
+  headerRow.appendChild(actionsTh);
+  thead.appendChild(headerRow);
+  t.appendChild(thead);
+  const tbody = document.createElement("tbody");
+
   if (!rows.length) {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td colspan="${cols.length + 1}" class="empty-msg">No bookings match your filter.</td>`;
@@ -111,13 +140,33 @@ function renderTable() {
   rows.forEach((row) => {
     const tr = document.createElement("tr");
     tr.dataset.id = row.id;
-    tr.innerHTML =
-      `<td>${row.Customer}</td><td>${row.Property}</td><td>${row["Check In"]}</td><td>${row["Check Out"]}</td><td>${row.Nights}</td><td>${row.Total}</td><td>${row.Status}</td>` +
-      `<td class="row-actions"><button class="btn btn--sm btn--icon" title="Edit" onclick="appEditBooking('${row.id}')">✏</button>` +
+    const cells = cols.map((col) => {
+      const td = document.createElement("td");
+      if (col.key === "total") {
+        td.textContent = utils.formatCurrency(row.total);
+      } else if (col.key === "nights") {
+        td.textContent = row.nights;
+      } else if (col.key === "status") {
+        td.innerHTML = utils.statusPill(row.status);
+      } else if (col.key === "customer") {
+        td.textContent = row.customer;
+      } else {
+        td.textContent = utils.formatDate(row[col.key]);
+      }
+      return td;
+    });
+    const actionsTd = document.createElement("td");
+    actionsTd.className = "row-actions";
+    actionsTd.innerHTML =
+      `<button class="btn btn--sm btn--icon" title="Edit" onclick="appEditBooking('${row.id}')">✏</button>` +
       `<button class="btn btn--sm btn--icon btn--danger" title="Delete" onclick="appDeleteBooking('${row.id}')">🗑</button>` +
-      `<a href="#/calendar" class="btn btn--sm btn--icon" title="View in calendar" onclick="appViewBookingInCalendar('${row.id}')">🗓</a></td>`;
+      `<a href="#/calendar" class="btn btn--sm btn--icon" title="View in calendar" onclick="appViewBookingInCalendar('${row.id}')">🗓</a>`;
+    cells.push(actionsTd);
+    cells.forEach((td) => tr.appendChild(td));
     tbody.appendChild(tr);
   });
+  t.appendChild(tbody);
+
   container.innerHTML = "";
   container.appendChild(t);
 }
