@@ -9,7 +9,7 @@
    Usage: auth.init() boots GIS; auth.isAuthed() returns bool;
           auth.api(action, body) => Promise<data>.
 */
-import { CONFIG } from "./config.js?v=15";
+import { CONFIG } from "./config.js?v=16";
 
 const TOKEN_KEY = "paraiso_gis_token";
 

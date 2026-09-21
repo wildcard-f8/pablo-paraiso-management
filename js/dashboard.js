@@ -2,9 +2,9 @@
    Charts: revenue vs expenses (bar), booking income over time (line),
            expenses by category (doughnut), bookings by status (doughnut).
 */
-import { api } from "./auth.js?v=15";
-import { utils } from "./utils.js?v=15";
-import { CONFIG } from "./config.js?v=15";
+import { api } from "./auth.js?v=16";
+import { utils } from "./utils.js?v=16";
+import { CONFIG } from "./config.js?v=16";
 
 let charts = {};
 let dashboardRoot = null;
