@@ -26,7 +26,7 @@ const COLUMNS = [
   { key: "minStock", label: "Min Stock", type: "number" },
 ];
 
-export function createSuppliers(_args, ref) {
+export function createSupplies(_args, ref) {
   appRef = ref;
   const section = document.createElement("section");
   section.className = "supplies-page";
