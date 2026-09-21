@@ -74,7 +74,7 @@ const app = {
     });
     $("#themeToggle").addEventListener("click", () => app.toggleTheme());
 
-    /* Export button — saves a local ZIP with CSV files of all backend data */
+    /* Export button — saves a local CSV file with all backend data */
     const exportBtn = $("#exportBtn");
     if (exportBtn) {
       exportBtn.addEventListener("click", () => {
@@ -82,7 +82,7 @@ const app = {
       });
     }
 
-    /* Import (merge) button — uploads a local CSV/ZIP backup to merge with online data */
+    /* Import (merge) button — uploads a local CSV backup to merge with online data */
     const importBtn = $("#importBtn");
     if (importBtn) {
       importBtn.addEventListener("click", () => {
@@ -358,14 +358,13 @@ const app = {
     const btn = $("#importBtn");
     if (btn) { btn.disabled = true; btn.textContent = "⏳ Importing…"; }
 
-    /* Create a hidden file input on demand — accept multiple CSV files or a ZIP */
+    /* Create a hidden file input on demand — accept CSV files */
     let fileInput = $("#importFileInput");
     if (!fileInput) {
       fileInput = document.createElement("input");
       fileInput.type = "file";
       fileInput.id = "importFileInput";
-      fileInput.accept = ".zip,application/zip,.csv,text/csv,text/plain";
-      fileInput.multiple = true;
+      fileInput.accept = ".csv,text/csv,text/plain";
       fileInput.style.display = "none";
       document.body.appendChild(fileInput);
     }

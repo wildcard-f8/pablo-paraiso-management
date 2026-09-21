@@ -1,9 +1,26 @@
-/* export.js - Offline backup and merge via CSV files.
-   Export: fetches all data, converts each entity to CSV, bundles into a
-   single ZIP for download (one CSV per entity — users unzip and open in Excel).
-   Import: reads a ZIP, parses CSVs back to JSON, sends to backend for merge.
+/* export.js - Offline backup and merge via a single CSV file.
+   Export: fetches all data, combines into one CSV with an entityType
+   column (users open in Excel, filter by entityType, edit, save).
+   Import: reads the CSV, splits by entityType, reconstructs JSON,
+   sends to backend for merge.
+
+   No ZIP, no JSZip, no multi-file juggling — just one CSV in, one CSV out.
 */
 import { api } from "./auth.js?v=17";
+
+const ENTITY_KEYS = ["finances", "customers", "bookings", "supplies", "calendarEvents"];
+// Maps backend entity keys to entityType labels used in the CSV
+const ENTITY_LABELS = {
+  finances: "Finances",
+  customers: "Customers",
+  bookings: "Bookings",
+  supplies: "Supplies",
+  calendarEvents: "CalendarEvents",
+};
+// Maps entityType labels back to internal keys
+const LABEL_TO_KEY = Object.fromEntries(
+  Object.entries(ENTITY_LABELS).map(([k, v]) => [v.toLowerCase(), k])
+);
 
 /**
  * Fetches all data entities from the backend.
@@ -22,13 +39,7 @@ async function fetchSpreadsheetSnapshot() {
     api.get("getCalendarEvents", { start: start.toISOString(), end: end.toISOString() }),
   ]);
 
-  return {
-    finances,
-    customers,
-    bookings,
-    supplies,
-    calendarEvents,
-  };
+  return { finances, customers, bookings, supplies, calendarEvents };
 }
 
 /* ── CSV helpers ── */
@@ -56,25 +67,17 @@ function csvEscape(value) {
  */
 function toCSV(data) {
   if (!data || !data.length) return "";
-
-  // Gather all unique keys, preserving first-seen order
   const keys = [];
   const seen = new Set();
   data.forEach((row) => {
     Object.keys(row).forEach((k) => {
-      if (!seen.has(k)) {
-        seen.add(k);
-        keys.push(k);
-      }
+      if (!seen.has(k)) { seen.add(k); keys.push(k); }
     });
   });
-
   const lines = [keys.map(csvEscape).join(",")];
-
   data.forEach((row) => {
     lines.push(keys.map((k) => csvEscape(row[k])).join(","));
   });
-
   return lines.join("\r\n") + "\r\n";
 }
 
@@ -94,87 +97,35 @@ function parseCSV(csv) {
 
   while (i < csv.length) {
     const ch = csv[i];
-
     if (ch === '"') {
-      if (inQuotes && csv[i + 1] === '"') {
-        // Escaped double-quote inside a quoted field
-        curField += '"';
-        i += 2;
-        continue;
-      }
-      inQuotes = !inQuotes;
-      i++;
-      continue;
+      if (inQuotes && csv[i + 1] === '"') { curField += '"'; i += 2; continue; }
+      inQuotes = !inQuotes; i++; continue;
     }
-
-    if (ch === ',' && !inQuotes) {
-      curRow.push(curField);
-      curField = "";
-      i++;
-      continue;
-    }
-
-    if (ch === '\n' && !inQuotes) {
-      curRow.push(curField);
-      rows.push(curRow);
-      curRow = [];
-      curField = "";
-      i++;
-      continue;
-    }
-
+    if (ch === ',' && !inQuotes) { curRow.push(curField); curField = ""; i++; continue; }
+    if (ch === '\n' && !inQuotes) { curRow.push(curField); rows.push(curRow); curRow = []; curField = ""; i++; continue; }
     if (ch === '\r' && !inQuotes) {
-      curRow.push(curField);
-      rows.push(curRow);
-      curRow = [];
-      curField = "";
-      // Skip a following \n (handles \r\n)
+      curRow.push(curField); rows.push(curRow); curRow = []; curField = "";
       if (csv[i + 1] === '\n') i++;
-      i++;
-      continue;
+      i++; continue;
     }
-
-    curField += ch;
-    i++;
+    curField += ch; i++;
   }
-
-  // Handle last row (if content doesn't end with a newline)
   if (curRow.length > 0 || curField.length > 0) {
-    curRow.push(curField);
-    rows.push(curRow);
+    curRow.push(curField); rows.push(curRow);
   }
-
   if (!rows.length) return [];
-
-  // First row is the header
   const header = rows[0];
   const result = [];
   for (let r = 1; r < rows.length; r++) {
     const row = {};
-    header.forEach((h, j) => {
-      row[h] = rows[r][j] !== undefined ? rows[r][j] : "";
-    });
+    header.forEach((h, j) => { row[h] = rows[r][j] !== undefined ? rows[r][j] : ""; });
     result.push(row);
   }
   return result;
 }
 
-/**
- * Reads a file as an ArrayBuffer (used for ZIP reading).
- */
-function readFileAsArrayBuffer(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error("Failed to read file"));
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-/**
- * Downloads a ZIP blob as a file.
- */
-function downloadZip(blob, filename) {
+function downloadCSV(csvText, filename) {
+  const blob = new Blob([csvText], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -188,9 +139,9 @@ function downloadZip(blob, filename) {
 /* ── Export ── */
 
 /**
- * Downloads all data as a ZIP of CSV files for local backup.
- * Each entity (finances, customers, bookings, supplies, calendarEvents)
- * becomes its own CSV file inside the ZIP.
+ * Downloads all data as a SINGLE CSV file for local backup.
+ * Each row has an 'entityType' column (Finances, Customers, Bookings,
+ * Supplies, CalendarEvents) so users can filter/sort in Excel.
  * @param {Function} [onProgress] - optional callback(message) for status updates
  * @return {Promise<string>} filename
  */
@@ -198,47 +149,49 @@ export async function exportSpreadsheet(onProgress = () => {}) {
   onProgress("Fetching data from server…");
   const snapshot = await fetchSpreadsheetSnapshot();
 
-  const entityKeys = ["finances", "customers", "bookings", "supplies", "calendarEvents"];
+  // Collect all unique keys across all entities (entityType first)
+  const allKeys = ["entityType"];
+  const seenKeys = new Set(["entityType"]);
+  ENTITY_KEYS.forEach((key) => {
+    const records = snapshot[key] || [];
+    records.forEach((row) => {
+      Object.keys(row).forEach((k) => {
+        if (!seenKeys.has(k)) { seenKeys.add(k); allKeys.push(k); }
+      });
+    });
+  });
+
+  // Build CSV rows
+  const lines = [allKeys.map(csvEscape).join(",")];
   let totalRecords = 0;
-  entityKeys.forEach((k) => {
-    const count = (snapshot[k] || []).length;
-    totalRecords += count;
-    onProgress(`  ${k}: ${count} records`);
-  });
-  onProgress(`Total: ${totalRecords} records. Creating CSV files…`);
 
-  // Use global JSZip (loaded via CDN script tag in index.html)
-  const zip = new JSZip();
-
-  entityKeys.forEach((key) => {
-    const data = snapshot[key] || [];
-    const csv = toCSV(data);
-    zip.file(`${key}.csv`, csv);
+  ENTITY_KEYS.forEach((entityKey) => {
+    const records = snapshot[entityKey] || [];
+    const label = ENTITY_LABELS[entityKey];
+    onProgress(`  ${label}: ${records.length} records`);
+    totalRecords += records.length;
+    records.forEach((row) => {
+      const values = allKeys.map((k) => k === "entityType" ? label : row[k]);
+      lines.push(values.map(csvEscape).join(","));
+    });
   });
 
-  // Add a metadata CSV for informational purposes
-  zip.file("README.csv", [
-    "key,value",
-    `appName,Pablo Paraiso Management`,
-    `exportedAt,${new Date().toISOString().slice(0, 10)}`,
-    `totalRecords,${totalRecords}`,
-    "",
-  ].join("\r\n"));
+  const csvText = lines.join("\r\n") + "\r\n";
+  onProgress(`Total: ${totalRecords} records. Preparing download…`);
 
-  onProgress("Generating ZIP…");
-  const blob = await zip.generateAsync({ type: "blob" });
-  const filename = `pablo-paraiso-backup-${new Date().toISOString().slice(0, 10)}.zip`;
-  downloadZip(blob, filename);
-
-  onProgress(`Saved ${filename} (${totalRecords} records in ${entityKeys.length + 1} CSV files)`);
+  const filename = `pablo-paraiso-backup-${new Date().toISOString().slice(0, 10)}.csv`;
+  downloadCSV(csvText, filename);
+  onProgress(`Saved ${filename} (${totalRecords} records)`);
   return filename;
 }
 
 /* ── Import ── */
 
 /**
- * Reads local CSV/ZIP backup files and merges them with online data.
- * Accepts a single file (ZIP or CSV) or an array of files (multiple CSVs).
+ * Reads a CSV backup file and merges it with online data.
+ *
+ * The CSV must have an 'entityType' column with values matching the entity
+ * labels: Finances, Customers, Bookings, Supplies, CalendarEvents.
  *
  * Merge strategy: additive + update-only, never delete.
  *   - New local records → inserted online
@@ -246,62 +199,65 @@ export async function exportSpreadsheet(onProgress = () => {}) {
  *   - Online-only records (new web bookings) → preserved
  *   - Conflicts → flagged, online version kept
  *   - Deletions → never propagated
+ *   - Calendar merge → skipped entirely
  *
- * @param {File|File[]} fileOrFiles - ZIP file with CSVs, or one+ CSV files
+ * @param {File|File[]} fileOrFiles - CSV backup file(s)
  * @param {Function} [onProgress] - optional callback(message) for status updates
  * @return {Promise<Object>} merge results
  */
 export async function importSpreadsheet(fileOrFiles, onProgress = () => {}) {
   onProgress("Reading local backup…");
 
-  // Normalise to an array — accept both a single file and multiple files
+  // Normalise to array — accept both a single file and multiple files
   const files = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
-  const entityKeys = ["finances", "customers", "bookings", "supplies", "calendarEvents"];
+  let allRows = [];
 
-  let payload = { data: {} };
-
-  // Process each file
   for (const file of files) {
-    const isZip = file.name.endsWith(".zip") || file.type === "application/zip" || file.type === "application/x-zip-compressed";
-
-    if (isZip) {
-      onProgress("Extracting ZIP…");
-      const arrayBuffer = await readFileAsArrayBuffer(file);
-      const zip = await JSZip.loadAsync(arrayBuffer);
-
-      const csvFiles = Object.keys(zip.files).filter((name) =>
-        name.endsWith(".csv") && name !== "README.csv"
-      );
-
-      for (const name of csvFiles) {
-        const csvText = await zip.files[name].async("string");
-        const key = name.replace(/\.csv$/, "").replace(/^.*\//, "");
-        if (entityKeys.includes(key)) {
-          const records = parseCSV(csvText);
-          payload.data[key] = records;
-          onProgress(`  ${key}: ${records.length} records`);
-        }
-      }
-    } else if (file.name.endsWith(".csv") || file.type === "text/csv" || file.type === "text/plain") {
-      // Individual CSV file — derive entity from filename
-      const csvText = await file.text();
-      const key = file.name.replace(/\.csv$/, "").toLowerCase();
-
-      onProgress(`  ${key}: parsing…`);
-      const records = parseCSV(csvText);
-      onProgress(`  ${key}: ${records.length} records`);
-
-      if (entityKeys.includes(key)) {
-        payload.data[key] = records;
-      } else {
-        throw new Error(`Unknown CSV entity in filename: "${key}". Expected one of: ${entityKeys.join(", ")}`);
-      }
-    } else {
-      throw new Error("Please upload a .zip file or .csv files.");
+    if (!file.name.endsWith(".csv") && !(file.type && file.type.startsWith("text/"))) {
+      throw new Error("Please upload a .csv file.");
     }
+    const text = await file.text();
+    const rows = parseCSV(text);
+    if (!rows.length) continue;
+
+    // Verify header has entityType column
+    const headers = Object.keys(rows[0]);
+    if (headers.indexOf("entityType") === -1) {
+      throw new Error(
+        `File "${file.name}" does not have an "entityType" column. ` +
+        "Please export from Pablo Paraiso Management and upload the same file."
+      );
+    }
+
+    onProgress(`  ${file.name}: ${rows.length} rows`);
+    allRows = allRows.concat(rows);
   }
 
-  const totalRecords = entityKeys.reduce((sum, k) => sum + (payload.data[k] || []).length, 0);
+  // Group rows by entityType
+  const grouped = {};
+  allRows.forEach((row) => {
+    const label = (row.entityType || "").trim();
+    const key = LABEL_TO_KEY[label.toLowerCase()];
+    if (!key) {
+      onProgress(`  ⚠ Unknown entityType "${label}" — skipped`);
+      return;
+    }
+    if (!grouped[key]) grouped[key] = [];
+    const record = Object.assign({}, row);
+    delete record.entityType;
+    grouped[key].push(record);
+  });
+
+  // Build payload for backend
+  const payload = { data: {} };
+  let totalRecords = 0;
+  ENTITY_KEYS.forEach((key) => {
+    const records = grouped[key] || [];
+    payload.data[key] = records;
+    totalRecords += records.length;
+    onProgress(`  ${ENTITY_LABELS[key]}: ${records.length} records`);
+  });
+
   if (totalRecords === 0) {
     throw new Error("No data found in the selected file(s).");
   }
