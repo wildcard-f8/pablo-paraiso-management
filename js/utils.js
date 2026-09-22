@@ -2,7 +2,7 @@
    Extracted from app.js so page modules can import utils
    without creating a circular dependency:  app ↔ dashboard.
 */
-import { CONFIG } from "./config.js?v=33";
+import { CONFIG } from "./config.js?v=34";
 
 export const $ = (sel, ctx = document) => ctx.querySelector(sel);
 export const $$ = (sel, ctx = document) => ctx.querySelectorAll(sel);

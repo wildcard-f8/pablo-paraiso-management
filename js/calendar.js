@@ -2,8 +2,8 @@
    Supports adding/editing/deleting calendar events, and clicking an event
    navigates to the bookings page for that booking.
 */
-import { api } from "./auth.js?v=33";
-import { utils } from "./utils.js?v=33";
+import { api } from "./auth.js?v=34";
+import { utils } from "./utils.js?v=34";
 
 let calendarRef = null;
 let calendarEl = null;

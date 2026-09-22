@@ -9,7 +9,7 @@
    Usage: auth.init() boots GIS; auth.isAuthed() returns bool;
           auth.api(action, body) => Promise<data>.
 */
-import { CONFIG } from "./config.js?v=33";
+import { CONFIG } from "./config.js?v=34";
 
 const TOKEN_KEY = "paraiso_gis_token";
 
@@ -217,6 +217,12 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
     opts.body = JSON.stringify(body);
   }
 
+  /* AbortController timeout — prevents fetch() hanging indefinitely on
+   * GAS cold starts that can take 10+ seconds */
+  const _controller = new AbortController();
+  const _timeout = setTimeout(() => _controller.abort(), 15000);
+  opts.signal = _controller.signal;
+
   /*
    * --- Network error retry ---
    * GAS web app URLs redirect (302) to script.googleusercontent.com. On a
@@ -224,8 +230,12 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
    */
   let resp;
   try {
+    if (_attempt === 0) console.log('fetchGAS:', method, url.toString().substring(0, 200) + (url.toString().length > 200 ? '...' : '') + ' (len=' + url.toString().length + ')');
     resp = await fetch(url.toString(), opts);
+    clearTimeout(_timeout);
+    if (_attempt === 0) console.log('fetchGAS: response status=' + resp.status + ' for action=' + action);
   } catch (networkErr) {
+    clearTimeout(_timeout);
     if (method === "GET" && _attempt < RETRY_LIMIT) {
       if (_attempt === 0) {
         console.warn(`fetchGAS: warming up backend for ${action} (attempt ${_attempt + 2}/${RETRY_LIMIT + 1})`);
