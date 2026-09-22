@@ -1,17 +1,17 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=21";
-import { api, auth } from "./auth.js?v=21";
-import { utils, $, $$ } from "./utils.js?v=21";
-import { createDashboard } from "./dashboard.js?v=21";
-import { createFinances } from "./finances.js?v=21";
-import { createCustomers } from "./customers.js?v=21";
-import { createBookings } from "./bookings.js?v=21";
-import { createCalendar } from "./calendar.js?v=21";
-import { createSupplies } from "./supplies.js?v=21";
-import { createWebsite } from "./website.js?v=21";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=21";
+import { CONFIG } from "./config.js?v=22";
+import { api, auth } from "./auth.js?v=22";
+import { utils, $, $$ } from "./utils.js?v=22";
+import { createDashboard } from "./dashboard.js?v=22";
+import { createFinances } from "./finances.js?v=22";
+import { createCustomers } from "./customers.js?v=22";
+import { createBookings } from "./bookings.js?v=22";
+import { createCalendar } from "./calendar.js?v=22";
+import { createSupplies } from "./supplies.js?v=22";
+import { createWebsite } from "./website.js?v=22";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=22";
 
 
 let currentParams = {};
@@ -54,6 +54,7 @@ const app = {
       this.bindAuth();
       this.initTheme();
       this.initNotifications();
+      this.bindIdleTimeout();
       /* When the tab regains focus, silently refresh the token if needed.
          This handles the "left open for hours" scenario: the periodic
          check in auth.js should have refreshed proactively, but this
@@ -288,6 +289,40 @@ const app = {
       /* Clear any dashboard content that may have started rendering */
       $("#pageSlot").innerHTML = "";
     });
+  },
+
+  /* ── Idle timeout (auto sign-out) ── */
+  bindIdleTimeout() {
+    /* Auto-sign-out after 30 minutes of inactivity — the property
+       data is sensitive and tabs are often left open on shared desks. */
+    const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+    let idleTimer = null;
+    const events = ["mousemove", "mousedown", "keypress", "touchstart", "scroll"];
+
+    const resetIdle = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      /* Only set a new timer if the user is currently authenticated */
+      if (auth.isAuthed()) {
+        idleTimer = setTimeout(() => {
+          this.showToast("Signing out due to inactivity…", "info", 3000);
+          auth.signOut();
+        }, IDLE_TIMEOUT_MS);
+      }
+    };
+
+    /* Track the last activity so we don't reset the timer during
+       silent refreshes that dispatch auth:changed. */
+    events.forEach((evt) => {
+      document.addEventListener(evt, resetIdle, { passive: true });
+    });
+
+    /* Start the timer on init; reset whenever auth state changes so
+       the clock starts fresh after sign-in and stops after sign-out. */
+    resetIdle();
+    document.addEventListener("auth:changed", () => resetIdle());
+
+    /* When navigating between pages, reset the timer too (user is active) */
+    window.addEventListener("hashchange", () => resetIdle());
   },
 
   parseHash() {
@@ -799,7 +834,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=21";
+export { utils, $, $$ } from "./utils.js?v=22";
 
 /* Export app and default */
 export { app };

@@ -2,7 +2,7 @@
    Extracted from app.js so page modules can import utils
    without creating a circular dependency:  app ↔ dashboard.
 */
-import { CONFIG } from "./config.js?v=21";
+import { CONFIG } from "./config.js?v=22";
 
 export const $ = (sel, ctx = document) => ctx.querySelector(sel);
 export const $$ = (sel, ctx = document) => ctx.querySelectorAll(sel);
@@ -127,9 +127,35 @@ export const computeDateRange = (preset, customFrom = "", customTo = "") => {
  */
 export const computeOccupancyRate = (bookings, fromISO, toISO) => {
   if (!bookings || !bookings.length) return 0;
-  const from = fromISO ? new Date(fromISO + "T00:00:00") : null;
-  if (!from) return 0;
-  const to = toISO ? new Date(toISO + "T23:59:59") : new Date(fromISO + "T23:59:59");
+  // When no explicit range is given (All time), derive it from the
+  // earliest check-in and latest check-out across all non-cancelled
+  // bookings so the percentage reflects the full operational window.
+  let actualFrom = fromISO;
+  let actualTo = toISO;
+  if (!actualFrom) {
+    const cinDates = bookings
+      .filter((b) => b.status !== "cancelled" && b.checkIn && b.checkOut)
+      .map((b) => parseDateSafe(b.checkIn))
+      .filter((d) => d && !isNaN(d.getTime()));
+    if (cinDates.length) {
+      cinDates.sort((a, b) => a - b);
+      actualFrom = formatDateISO(cinDates[0]);
+    }
+  }
+  if (!actualFrom) return 0;
+  if (!actualTo) {
+    const coutDates = bookings
+      .filter((b) => b.status !== "cancelled" && b.checkIn && b.checkOut)
+      .map((b) => parseDateSafe(b.checkOut))
+      .filter((d) => d && !isNaN(d.getTime()));
+    if (coutDates.length) {
+      coutDates.sort((a, b) => a - b);
+      actualTo = formatDateISO(coutDates[coutDates.length - 1]);
+    }
+  }
+  const from = new Date(actualFrom + "T00:00:00");
+  const to = actualTo ? new Date(actualTo + "T23:59:59") : new Date(actualFrom + "T23:59:59");
+  if (from > to) return 0; /* guard against inverted range producing negatives */
   // Total available days in the period
   const totalDays = Math.ceil((to - from) / (1000 * 60 * 60 * 24)) + 1;
   if (totalDays <= 0) return 0;
@@ -147,7 +173,8 @@ export const computeOccupancyRate = (bookings, fromISO, toISO) => {
       bookedNights += Math.ceil((end - start) / (1000 * 60 * 60 * 24));
     }
   });
-  return Math.round((bookedNights / totalDays) * 100);
+  /* Return with one decimal place for precision */
+  return parseFloat(((bookedNights / totalDays) * 100).toFixed(1));
 };
 
 /* Generic table builder used by CRUD pages */

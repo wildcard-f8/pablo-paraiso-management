@@ -3,9 +3,9 @@
    Model: {id,name,email,phone,address,notes}
    Note: firstRequest/lastRequest are computed from the Bookings sheet.
 */
-import { api } from "./auth.js?v=21";
-import { utils } from "./utils.js?v=21";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=21";
+import { api } from "./auth.js?v=22";
+import { utils } from "./utils.js?v=22";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=22";
 
 let container = null;
 let data = [];
@@ -34,6 +34,7 @@ export function createCustomers(_args, ref) {
   section.innerHTML = `
     <div class="toolbar">
       <div class="actions">
+        <span class="customer-count" id="customerCount">0 customers</span>
         <input class="search-box" id="customerSearch" placeholder="Search name, email, phone…" type="search" inputmode="search" />
         <div class="date-range-view">
           <select class="view-select" id="customerDatePreset">
@@ -147,6 +148,12 @@ function renderTable() {
     filtered = utils.filterByDateRange(filtered, "firstRequest", from || null, to || null);
   }
   const sorted = applySort(filtered, cols, sortState);
+
+  // Update customer count in toolbar
+  const countEl = container.querySelector("#customerCount");
+  if (countEl) {
+    countEl.textContent = `${filtered.length} customer${filtered.length === 1 ? "" : "s"}`;
+  }
 
   const rows = sorted.map((c) => ({
     id: c.id,

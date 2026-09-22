@@ -3,9 +3,9 @@
            expenses by category (doughnut), bookings by status (doughnut),
            occupancy rate over time (bar).
 */
-import { api } from "./auth.js?v=21";
-import { utils } from "./utils.js?v=21";
-import { CONFIG } from "./config.js?v=21";
+import { api } from "./auth.js?v=22";
+import { utils } from "./utils.js?v=22";
+import { CONFIG } from "./config.js?v=22";
 
 let charts = {};
 let dashboardRoot = null;
@@ -75,7 +75,6 @@ export function createDashboard(_args, ref) {
       <div class="card card--stat"><div class="card__label">Net Profit</div><div class="card__value" id="statNet">—</div><div class="card__trend" id="trendNet"></div></div>
       <div class="card card--stat"><div class="card__label">Occupancy Rate</div><div class="card__value" id="statOccupancy">—</div><div class="card__trend" id="trendOccupancy"></div></div>
       <div class="card card--stat"><div class="card__label">Active Bookings</div><div class="card__value" id="statBookings">—</div><div class="card__trend" id="trendBookings"></div></div>
-      <div class="card card--stat"><div class="card__label">Customers</div><div class="card__value" id="statCustomers">—</div><div class="card__trend" id="trendCustomers"></div></div>
       <div class="card card--stat"><div class="card__label">Low Stock Items</div><div class="card__value" id="statLowStock">—</div><div class="card__trend" id="trendLowStock"></div></div>
     </div>
 
@@ -217,7 +216,6 @@ function renderDashboard(finances, bookings, supplies, customers) {
   el("statNet", utils.formatCurrency(net));
   el("statOccupancy", `${occupancy}%`);
   el("statBookings", activeBookings.length);
-  el("statCustomers", customers.length);
   el("statLowStock", lowStock.length);
 
   const trendNet = dashboardRoot.querySelector("#trendNet");
@@ -460,7 +458,7 @@ function renderOccupancyChart(canvasEl, bookings, C) {
     weeks[weekKey].bookedNights += nights;
   });
   const weekKeys = Object.keys(weeks).sort();
-  const data = weekKeys.map((k) => Math.round((weeks[k].bookedNights / weeks[k].totalDays) * 100));
+  const data = weekKeys.map((k) => parseFloat((weeks[k].bookedNights / weeks[k].totalDays * 100).toFixed(1)));
   return new Chart(canvasEl, {
     type: "bar",
     data: {
