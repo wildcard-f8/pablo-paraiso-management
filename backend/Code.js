@@ -625,6 +625,25 @@ function isUserAuthorized(email) {
 }
 
 /**
+ * Administrative actions use a separate allow-list. Set ADMIN_USERS in
+ * Script Properties as a comma-separated list of Google account emails.
+ */
+function getAdminUsers() {
+  var raw = PropertiesService.getScriptProperties().getProperty('ADMIN_USERS') || '';
+  return raw.split(',').map(function(e) { return e.trim().toLowerCase(); }).filter(function(e) { return e; });
+}
+
+function isAdminUser(email) {
+  return !!email && getAdminUsers().indexOf(email.toLowerCase()) !== -1;
+}
+
+function requireAdmin(email) {
+  if (!isAdminUser(email)) {
+    throw new Error('Administrator access required.');
+  }
+}
+
+/**
  * Sets the authorized users list (comma-separated emails).
  * Run from the Apps Script editor — edit the email list below first,
  * then click ▶. The list is stored in Script Properties.
@@ -824,6 +843,14 @@ function setCalendarId() {
  * @param {Object} e — the doGet/doPost event parameter
  * @return {{valid: boolean, email: ?string, status: number, error: ?string}}
  */
+/** CacheService keys are limited in length; GIS JWT/access tokens are not.
+ * Hash the token before using it as a cache key. */
+function authCacheKey(token) {
+  return 'auth_' + Utilities.base64EncodeWebSafe(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token)
+  );
+}
+
 function requireAuth(e) {
   // Extract token from Authorization header OR _token query parameter.
   // The frontend sends the GIS token as a _token query param (not the
@@ -853,7 +880,8 @@ function requireAuth(e) {
    * to Google's tokeninfo/userinfo endpoints on every API request, which
    * can fail under parallel load (dashboard makes 3-4 calls at once). */
   var _cache = CacheService.getScriptCache();
-  var _cachedResult = _cache.get(token);
+  var _cacheKey = authCacheKey(token);
+  var _cachedResult = _cache.get(_cacheKey);
   if (_cachedResult) {
     try {
       var _cached = JSON.parse(_cachedResult);
@@ -916,7 +944,7 @@ function requireAuth(e) {
 
     /* Cache the verified token for 59 minutes (1 hour = GIS token lifetime) */
     try {
-      _cache.put(token, JSON.stringify({ valid: true, email: info.email }), 59 * 60);
+      _cache.put(_cacheKey, JSON.stringify({ valid: true, email: info.email }), 59 * 60);
       logActivity({ action: "login", status: "success", details: "Token verified and cached", data: { email: info.email } });
     } catch (_cacheWriteErr) {
       console.log('requireAuth: cache write failed: ' + _cacheWriteErr.message);
@@ -943,8 +971,8 @@ function doGet(e) {
     return sendSuccess(getWebsiteContent(e.parameter.key));
   }
 
-  /* Debug endpoint — checks token verification without auth */
-  if (action === 'debugAuth') {
+  /* Diagnostic endpoint is intentionally disabled in production. */
+  if (false && action === 'debugAuth') {
     var dbgToken = e.parameter._token;
     if (!dbgToken) {
       return sendJson({ success: true, data: { tokenReceived: false, message: 'No _token parameter provided' } });
@@ -1004,7 +1032,7 @@ function doGet(e) {
       case 'getBookings':       result = getBookings(); break;
       case 'getSupplies':       result = getSupplies(); break;
       case 'getCalendarEvents': result = getCalendarEvents(e.parameter.start, e.parameter.end); break;
-      case 'getAuthStatus':     result = getAuthStatus(); break;
+      case 'getAuthStatus':     requireAdmin(_ga.email); result = getAuthStatus(); break;
       case 'getWebsiteContent': result = getWebsiteContent(e.parameter.key); break;
       default:
         return sendError('Unknown action: ' + action);
@@ -1084,8 +1112,8 @@ function doPost(e) {
       case 'updateCalendarEvent': result = updateCalendarEvent(data); break;
       case 'deleteCalendarEvent': result = deleteCalendarEvent(data); break;
       case 'mergeSpreadsheet':    result = mergeSpreadsheet(data); break;
-      case 'addAuthorizedUser':   result = addAuthorizedUser(data); break;
-      case 'removeAuthorizedUser':result = removeAuthorizedUser(data); break;
+      case 'addAuthorizedUser':   requireAdmin(_ga.email); result = addAuthorizedUser(data); break;
+      case 'removeAuthorizedUser':requireAdmin(_ga.email); result = removeAuthorizedUser(data); break;
       case 'updateWebsiteContent': result = updateWebsiteContent(data); break;
       case 'uploadImage':          result = uploadImage(data); break;
       default:
@@ -1437,7 +1465,7 @@ function writeWebBookingRow(data, bookingId, eventId, timestamp, clientIP) {
       PACKAGE_DURATIONS_HOURS[data.package] || 6,
       eventId || "",
       data.message || "",
-      "confirmed",
+      booking.status || "pending",
       JSON.stringify(data)
     ];
     sheet.appendRow(row);

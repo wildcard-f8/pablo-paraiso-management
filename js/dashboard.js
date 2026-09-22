@@ -3,9 +3,9 @@
            expenses by category (doughnut), bookings by status (doughnut),
            occupancy rate over time (bar).
 */
-import { api } from "./auth.js?v=37";
-import { utils } from "./utils.js?v=37";
-import { CONFIG } from "./config.js?v=37";
+import { api } from "./auth.js?v=40";
+import { utils } from "./utils.js?v=40";
+import { CONFIG } from "./config.js?v=40";
 
 let charts = {};
 let dashboardRoot = null;
@@ -17,7 +17,6 @@ let dashboardDateTo = "";
 let cachedFinances = [];
 let cachedBookings = [];
 let cachedSupplies = [];
-let cachedCustomers = [];
 
 /* Resolve a CSS custom property to its actual computed value so Chart.js
    can use it. Chart.js does NOT understand CSS variables on its own —
@@ -150,14 +149,12 @@ async function loadDashboard() {
      below resolves in milliseconds — no need for a spinner flash. */
   const allCached = api.isCached("getFinances") &&
     api.isCached("getBookings") &&
-    api.isCached("getCustomers") &&
     api.isCached("getSupplies");
   if (!allCached) appRef.showPageLoader("Starting up backend (may take a few seconds)…");
   try {
-    const [finances, bookings, customers, supplies] = await Promise.all([
+    const [finances, bookings, supplies] = await Promise.all([
       api.get("getFinances"),
       api.get("getBookings"),
-      api.get("getCustomers"),
       api.get("getSupplies"),
     ]);
 
@@ -168,9 +165,8 @@ async function loadDashboard() {
     cachedFinances = finances;
     cachedBookings = bookings;
     cachedSupplies = supplies;
-    cachedCustomers = customers;
 
-    renderDashboard(cachedFinances, cachedBookings, cachedSupplies, cachedCustomers);
+    renderDashboard(cachedFinances, cachedBookings, cachedSupplies);
     appRef.hidePageLoader();
   } catch (err) {
     /* If the error is auth-related, the auth:required/auth:denied handler
@@ -192,10 +188,10 @@ function applyDashboardFilters() {
     f = utils.filterByDateRange(f, "date", from || null, to || null);
     b = utils.filterByDateRange(b, "checkIn", from || null, to || null);
   }
-  renderDashboard(f, b, cachedSupplies, cachedCustomers);
+  renderDashboard(f, b, cachedSupplies);
 }
 
-function renderDashboard(finances, bookings, supplies, customers) {
+function renderDashboard(finances, bookings, supplies) {
   if (!dashboardRoot) return;
   const slot = dashboardRoot.querySelector("#statsGrid");
   if (!slot) return;

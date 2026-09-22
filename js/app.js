@@ -1,17 +1,17 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=37";
-import { api, auth } from "./auth.js?v=37";
-import { utils, $, $$ } from "./utils.js?v=37";
-import { createDashboard } from "./dashboard.js?v=37";
-import { createFinances } from "./finances.js?v=37";
-import { createCustomers } from "./customers.js?v=37";
-import { createBookings } from "./bookings.js?v=37";
-import { createCalendar } from "./calendar.js?v=37";
-import { createSupplies } from "./supplies.js?v=37";
-import { createWebsite } from "./website.js?v=37";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=37";
+import { CONFIG } from "./config.js?v=40";
+import { api, auth } from "./auth.js?v=40";
+import { utils, $, $$ } from "./utils.js?v=40";
+import { createDashboard } from "./dashboard.js?v=40";
+import { createFinances } from "./finances.js?v=40";
+import { createCustomers } from "./customers.js?v=40";
+import { createBookings } from "./bookings.js?v=40";
+import { createCalendar } from "./calendar.js?v=40";
+import { createSupplies } from "./supplies.js?v=40";
+import { createWebsite } from "./website.js?v=40";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=40";
 
 
 let currentParams = {};
@@ -241,6 +241,7 @@ const app = {
             }
           });
       } else {
+        api.clearCache();
         hideVerifying();
         syncGate();
       }
@@ -609,7 +610,7 @@ const app = {
     const container = $("#toastContainer");
     const t = document.createElement("div");
     t.className = `toast ${type}`;
-    t.innerHTML = `<span class="toast__msg">${message}</span><button class="toast__close" aria-label="Close">&times;</button>`;
+    t.innerHTML = `<span class="toast__msg">${utils.escapeHTML(message)}</span><button class="toast__close" aria-label="Close">&times;</button>`;
     t.querySelector(".toast__close").addEventListener("click", () => {
       t.classList.remove("show");
       t.addEventListener("transitionend", () => t.remove(), { once: true });
@@ -685,7 +686,7 @@ const app = {
     const item = document.createElement("div");
     item.className = `notification-item notification-item--${n.type || "info"}`;
     const time = new Date(n.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    item.innerHTML = `<span class="notification-item__msg">${n.message}</span><span class="notification-item__time">${time}</span>`;
+    item.innerHTML = `<span class="notification-item__msg">${utils.escapeHTML(n.message)}</span><span class="notification-item__time">${time}</span>`;
     list.appendChild(item);
     });
     if (badge) {
@@ -840,7 +841,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=37";
+export { utils, $, $$ } from "./utils.js?v=40";
 
 /* Export app and default */
 export { app };

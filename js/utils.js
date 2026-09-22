@@ -2,7 +2,7 @@
    Extracted from app.js so page modules can import utils
    without creating a circular dependency:  app ↔ dashboard.
 */
-import { CONFIG } from "./config.js?v=37";
+import { CONFIG } from "./config.js?v=40";
 
 export const $ = (sel, ctx = document) => ctx.querySelector(sel);
 export const $$ = (sel, ctx = document) => ctx.querySelectorAll(sel);
@@ -31,11 +31,11 @@ export const statusPill = (status) => {
     paid: "pill pill--paid",
     overdue: "pill pill--overdue",
   }[status] || "pill";
-  return `<span class="${cls}">${capitalize(status || "unknown")}</span>`;
+  return `<span class="${cls}">${escapeHTML(capitalize(status || "unknown"))}</span>`;
 };
 
 export const moneyPill = (type) =>
-  `<span class="pill ${type === "income" ? "pill--income" : "pill--expense"}">${capitalize(type)}</span>`;
+  `<span class="pill ${type === "income" ? "pill--income" : "pill--expense"}">${escapeHTML(capitalize(type))}</span>`;
 
 export const confirm = (msg) => window.confirm(msg);
 

@@ -9,7 +9,7 @@
    Usage: auth.init() boots GIS; auth.isAuthed() returns bool;
           auth.api(action, body) => Promise<data>.
 */
-import { CONFIG } from "./config.js?v=37";
+import { CONFIG } from "./config.js?v=40";
 
 const TOKEN_KEY = "paraiso_gis_token";
 
@@ -96,6 +96,8 @@ export const auth = {
   },
 
   init() {
+    /* Protected API responses must never survive an auth transition. */
+    api.clearCache();
     const stored = localStorage.getItem(TOKEN_KEY);
     if (stored) {
       /* Check if stored token is expired — if so, clear it so the user
@@ -201,7 +203,7 @@ function persistToken(token) {
  * redirect chain (script.google.com → script.googleusercontent.com).
  * XHR handles this redirect more reliably in some browsers.
  */
-function _fetchGAS_XHR(url, _attempt) {
+function _fetchGAS_XHR(url) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("GET", url);
@@ -304,18 +306,19 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
     if (_attempt === 0) console.log('fetchGAS: response status=' + resp.status + ' for action=' + action);
   } catch (networkErr) {
     clearTimeout(_timeout);
-    /* If fetch() failed with "Failed to fetch" and this was a GET, try XHR as a fallback.
-       XHR sometimes succeeds where fetch() fails for GAS's redirect chain. */
-    if (method === "GET" && _attempt === 0 && networkErr.message === "Failed to fetch") {
-      console.warn('fetchGAS: fetch() failed, trying XHR fallback for ' + action);
+    /* Chrome reports GAS redirect/CORS failures with slightly different
+       messages ("Failed to fetch", "Load failed", or "NetworkError").
+       Try XHR on every GET attempt, not only attempt 0: the old code used
+       XHR once and then reverted to fetch() for the two retries, so a
+       persistent redirect failure always ended as a misleading network error. */
+    const networkMessage = String(networkErr?.message || networkErr);
+    const isLikelyCorsFailure = /failed to fetch|load failed|networkerror|network error/i.test(networkMessage);
+    if (method === "GET" && isLikelyCorsFailure) {
+      console.warn('fetchGAS: fetch() failed, trying XHR fallback for ' + action + ' (attempt ' + _attempt + ')');
       try {
-        resp = await _fetchGAS_XHR(url.toString(), _attempt);
+        resp = await _fetchGAS_XHR(url.toString());
         _usedXHR = true;
         console.log('fetchGAS: XHR fallback succeeded, status=' + resp.status + ' for action=' + action);
-        if (resp.status === 200 || resp.status === 0) {
-          /* XHR with CORS returns status 200 on success.
-             Status 0 with a response body means cross-origin redirect succeeded. */
-        }
       } catch (xhrErr) {
         console.error('fetchGAS: XHR fallback also failed:', xhrErr.message);
         /* Fall through to retry/error handling below */
