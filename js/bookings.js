@@ -3,11 +3,11 @@
    Model: {id, customerId, property, checkIn, checkOut, nights, total, status}
    Single property: "Pablo Paraiso Pool House" (hardcoded — no Properties sheet).
 */
-import { api } from "./auth.js?v=31";
-import { utils } from "./utils.js?v=31";
-import { refreshDashboard } from "./dashboard.js?v=31";
-import { CONFIG } from "./config.js?v=31";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=31";
+import { api } from "./auth.js?v=32";
+import { utils } from "./utils.js?v=32";
+import { refreshDashboard } from "./dashboard.js?v=32";
+import { CONFIG } from "./config.js?v=32";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=32";
 
 const PROPERTY_NAME = "Pablo Paraiso Pool House";
 

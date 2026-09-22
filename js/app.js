@@ -1,17 +1,17 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=31";
-import { api, auth } from "./auth.js?v=31";
-import { utils, $, $$ } from "./utils.js?v=31";
-import { createDashboard } from "./dashboard.js?v=31";
-import { createFinances } from "./finances.js?v=31";
-import { createCustomers } from "./customers.js?v=31";
-import { createBookings } from "./bookings.js?v=31";
-import { createCalendar } from "./calendar.js?v=31";
-import { createSupplies } from "./supplies.js?v=31";
-import { createWebsite } from "./website.js?v=31";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=31";
+import { CONFIG } from "./config.js?v=32";
+import { api, auth } from "./auth.js?v=32";
+import { utils, $, $$ } from "./utils.js?v=32";
+import { createDashboard } from "./dashboard.js?v=32";
+import { createFinances } from "./finances.js?v=32";
+import { createCustomers } from "./customers.js?v=32";
+import { createBookings } from "./bookings.js?v=32";
+import { createCalendar } from "./calendar.js?v=32";
+import { createSupplies } from "./supplies.js?v=32";
+import { createWebsite } from "./website.js?v=32";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=32";
 
 
 let currentParams = {};
@@ -228,11 +228,15 @@ const app = {
             app.navigate(currentParams.page || "dashboard", currentParams.args);
           })
           .catch((err) => {
-            /* The auth:required / auth:denied handlers (below) have already
-             * run by now via the fetchGAS throw — they reset the gate to
-             * the sign-in or denied screen. Here we just make sure the
-             * verifying spinner is cleaned up. */
+            /* Auth probe failed — likely GAS cold start (non-JSON 404)
+               after all retries exhausted. Show a helpful message. */
             hideVerifying();
+            const msg = err.message || "";
+            if (msg.includes("non-JSON") || msg.includes("Network error") || msg.includes("warm")) {
+              this.showToast("Backend is starting up. Please wait a moment and click Sign In again.", "info", 8000);
+            } else if (!msg.includes("Authentication") && !msg.includes("token")) {
+              this.showToast("Sign-in check failed: " + msg.slice(0, 100), "error", 5000);
+            }
           });
       } else {
         hideVerifying();
@@ -834,7 +838,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=31";
+export { utils, $, $$ } from "./utils.js?v=32";
 
 /* Export app and default */
 export { app };

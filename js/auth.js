@@ -9,7 +9,7 @@
    Usage: auth.init() boots GIS; auth.isAuthed() returns bool;
           auth.api(action, body) => Promise<data>.
 */
-import { CONFIG } from "./config.js?v=31";
+import { CONFIG } from "./config.js?v=32";
 
 const TOKEN_KEY = "paraiso_gis_token";
 
@@ -177,7 +177,10 @@ function persistToken(token) {
  * Resolves with the raw `data` on success.
  * Rejects with an Error(message, {cause}) on failure.
  */
-export async function fetchGAS(action, { method = "GET", body = null, query = null } = {}, _retry = false) {
+export async function fetchGAS(action, { method = "GET", body = null, query = null } = {}, _attempt = 0) {
+  const RETRY_LIMIT = 2; // 3 total attempts (initial + 2 retries)
+  const RETRY_DELAYS = [2000, 4000]; // progressive delays: 2s, 4s
+
   const url = new URL(CONFIG.API_BASE_URL);
   url.searchParams.set("action", action);
   // Extra query params (e.g. start/end for getCalendarEvents) — set AFTER action
@@ -192,10 +195,11 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
    * Token is sent as a _token query param (not the Authorization header) so
    * that the request stays a CORS "simple request" (no custom headers) and
    * the browser does NOT send a preflight OPTIONS. Google Apps Script's
-   * web-app proxy does not return CORS headers on OPTIONS, which causes the
-   * preflight to fail with "Failed to fetch". Simple requests (GET with no
-   * custom headers, or POST with Content-Type: text/plain) go straight
-   * through and inherit access-control-allow-origin from Google's redirect.
+   * web-app proxy does not return CORS headers on OPTIONS responses, so
+   * preflight-based requests fail with "Failed to fetch". Simple requests
+   * (GET with no custom headers, or POST with Content-Type: text/plain) go
+   * straight through and inherit access-control-allow-origin from Google's
+   * redirect.
    */
   const token = auth.getToken();
   if (token) url.searchParams.set("_token", token);
@@ -208,17 +212,21 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
     opts.body = JSON.stringify(body);
   }
 
+  /*
+   * --- Network error retry ---
+   * GAS web app URLs redirect (302) to script.googleusercontent.com. On a
+   * cold start, the redirect chain can fail or time out. Retry GET requests.
+   */
   let resp;
   try {
     resp = await fetch(url.toString(), opts);
   } catch (networkErr) {
-    /* Network error — could be a CORS redirect failure from GAS's
-       302 → script.googleusercontent.com chain. Retry once after a
-       brief delay to let the GAS instance warm up. */
-    if (method === "GET" && !_retry) {
-      console.warn(`fetchGAS: retrying ${action} after network error —`, networkErr.message);
-      await new Promise((r) => setTimeout(r, 1000));
-      return fetchGAS(action, { method, body, query }, true);
+    if (method === "GET" && _attempt < RETRY_LIMIT) {
+      if (_attempt === 0) {
+        console.warn(`fetchGAS: warming up backend for ${action} (attempt ${_attempt + 2}/${RETRY_LIMIT + 1})`);
+      }
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS[_attempt]));
+      return fetchGAS(action, { method, body, query }, _attempt + 1);
     }
     throw new Error(`Network error: ${networkErr.message}`, { cause: networkErr });
   }
@@ -228,14 +236,15 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
   try {
     payload = JSON.parse(text);
   } catch (_e) {
-    /* Non-JSON response — GAS may have redirected to a Google
-       anti-bot / "Please verify you're not a bot" page, or the 302
-       redirect URL expired. Retry once for GET requests after a
-       brief delay to let the GAS instance stabilise. */
-    if (method === "GET" && !_retry) {
-      console.warn(`fetchGAS: retrying ${action} after non-JSON (${resp.status}) —`, text.slice(0, 80));
-      await new Promise((r) => setTimeout(r, 1000));
-      return fetchGAS(action, { method, body, query }, true);
+    /* Non-JSON response — GAS may have returned an anti-bot HTML page,
+       a 404 redirect, or a cold-start interstitial. Retry GET requests
+       with progressive delays to let the GAS instance warm up. */
+    if (method === "GET" && _attempt < RETRY_LIMIT) {
+      if (_attempt === 0) {
+        console.warn(`fetchGAS: retrying ${action} after non-JSON (${resp.status}) —`, text.slice(0, 80));
+      }
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS[_attempt]));
+      return fetchGAS(action, { method, body, query }, _attempt + 1);
     }
     throw new Error(`Backend returned non-JSON (${resp.status}): ${text.slice(0, 120)}`);
   }
@@ -248,13 +257,12 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
     const statusCode = payload.status || resp.status;
     const errMsg = payload.error || "";
     const isAuthErr = statusCode === 401 || errMsg.includes("Authentication required") || errMsg.includes("Invalid token");
-    const isDeniedErr = statusCode === 403 || errMsg.includes("not authorized") || errMsg.includes("Access denied");
     /* 401 → backend not authenticated: tell the app to prompt sign-in */
     if (isAuthErr) {
       document.dispatchEvent(new CustomEvent("auth:required", { detail: { message: errMsg } }));
     }
-    /* 403 → signed in but not on the allow-list */
-    if (isDeniedErr) {
+    /* 403 → signed in but not on allow-list */
+    if (statusCode === 403 || errMsg.includes("not authorized") || errMsg.includes("Access denied")) {
       document.dispatchEvent(new CustomEvent("auth:denied", { detail: { message: errMsg } }));
     }
     const err = new Error(errMsg || `Request failed (action=${action})`);

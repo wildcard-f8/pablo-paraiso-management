@@ -3,9 +3,9 @@
            expenses by category (doughnut), bookings by status (doughnut),
            occupancy rate over time (bar).
 */
-import { api } from "./auth.js?v=31";
-import { utils } from "./utils.js?v=31";
-import { CONFIG } from "./config.js?v=31";
+import { api } from "./auth.js?v=32";
+import { utils } from "./utils.js?v=32";
+import { CONFIG } from "./config.js?v=32";
 
 let charts = {};
 let dashboardRoot = null;
@@ -152,7 +152,7 @@ async function loadDashboard() {
     api.isCached("getBookings") &&
     api.isCached("getCustomers") &&
     api.isCached("getSupplies");
-  if (!allCached) appRef.showPageLoader("Loading dashboard…");
+  if (!allCached) appRef.showPageLoader("Starting up backend (may take a few seconds)…");
   try {
     const [finances, bookings, customers, supplies] = await Promise.all([
       api.get("getFinances"),
