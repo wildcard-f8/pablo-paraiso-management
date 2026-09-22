@@ -1,17 +1,17 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=34";
-import { api, auth } from "./auth.js?v=34";
-import { utils, $, $$ } from "./utils.js?v=34";
-import { createDashboard } from "./dashboard.js?v=34";
-import { createFinances } from "./finances.js?v=34";
-import { createCustomers } from "./customers.js?v=34";
-import { createBookings } from "./bookings.js?v=34";
-import { createCalendar } from "./calendar.js?v=34";
-import { createSupplies } from "./supplies.js?v=34";
-import { createWebsite } from "./website.js?v=34";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=34";
+import { CONFIG } from "./config.js?v=35";
+import { api, auth } from "./auth.js?v=35";
+import { utils, $, $$ } from "./utils.js?v=35";
+import { createDashboard } from "./dashboard.js?v=35";
+import { createFinances } from "./finances.js?v=35";
+import { createCustomers } from "./customers.js?v=35";
+import { createBookings } from "./bookings.js?v=35";
+import { createCalendar } from "./calendar.js?v=35";
+import { createSupplies } from "./supplies.js?v=35";
+import { createWebsite } from "./website.js?v=35";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=35";
 
 
 let currentParams = {};
@@ -231,11 +231,13 @@ const app = {
             /* Auth probe failed — likely GAS cold start (non-JSON 404)
                after all retries exhausted. Show a helpful message. */
             hideVerifying();
-            const msg = err.message || "";
-            if (msg.includes("non-JSON") || msg.includes("Network error") || msg.includes("warm")) {
-              this.showToast("Backend is starting up. Please wait a moment and click Sign In again.", "info", 8000);
-            } else if (!msg.includes("Authentication") && !msg.includes("token")) {
-              this.showToast("Sign-in check failed: " + msg.slice(0, 100), "error", 5000);
+            const msg = err.message || String(err);
+            if (msg.includes("Authentication required") || msg.includes("Invalid token")) {
+              /* Auth error — show sign-in button (already shown by hideVerifying) */
+            } else if (msg.includes("Network error") || msg.includes("non-JSON")) {
+              /* Network/backend error — show retry guidance */
+              const gateCaption = $(".auth-gate__caption");
+              if (gateCaption) gateCaption.textContent = "Backend starting up… click Sign In to retry";
             }
           });
       } else {
@@ -838,7 +840,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=34";
+export { utils, $, $$ } from "./utils.js?v=35";
 
 /* Export app and default */
 export { app };

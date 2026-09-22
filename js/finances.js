@@ -2,11 +2,11 @@
    Endpoint actions: getFinances, addFinance, updateFinance, deleteFinance.
    Model fields: id, date, type, category, description, amount, bookingId
 */
-import { api } from "./auth.js?v=34";
-import { utils } from "./utils.js?v=34";
-import { refreshDashboard } from "./dashboard.js?v=34";
-import { CONFIG } from "./config.js?v=34";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=34";
+import { api } from "./auth.js?v=35";
+import { utils } from "./utils.js?v=35";
+import { refreshDashboard } from "./dashboard.js?v=35";
+import { CONFIG } from "./config.js?v=35";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=35";
 
 let tableEl = null;
 let appRef = null;

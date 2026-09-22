@@ -6,7 +6,7 @@
 
    No ZIP, no JSZip, no multi-file juggling — just one CSV in, one CSV out.
 */
-import { api } from "./auth.js?v=34";
+import { api } from "./auth.js?v=35";
 
 const ENTITY_KEYS = ["finances", "customers", "bookings", "supplies", "calendarEvents"];
 // Maps backend entity keys to entityType labels used in the CSV

@@ -9,7 +9,7 @@
    Usage: auth.init() boots GIS; auth.isAuthed() returns bool;
           auth.api(action, body) => Promise<data>.
 */
-import { CONFIG } from "./config.js?v=34";
+import { CONFIG } from "./config.js?v=35";
 
 const TOKEN_KEY = "paraiso_gis_token";
 
@@ -91,7 +91,20 @@ export const auth = {
 
   init() {
     const stored = localStorage.getItem(TOKEN_KEY);
-    if (stored) idToken = stored;
+    if (stored) {
+      /* Check if stored token is expired — if so, clear it so the user
+         sees the sign-in screen instead of a confusing auth error. */
+      if (stored.split(".").length === 3) {
+        /* It's a JWT — check expiry */
+        if (isTokenExpiringSoon(stored, 0)) {
+          console.log("auth: stored token is expired, clearing");
+          persistToken(null);
+        }
+      }
+      /* If stored is not a JWT (opaque access token), keep it —
+         we can't check expiry without calling the backend */
+      if (localStorage.getItem(TOKEN_KEY)) idToken = stored;
+    }
 
     loadGisScript()
       .then(() => {
