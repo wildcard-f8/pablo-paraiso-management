@@ -943,6 +943,11 @@ function doPost(e) {
       return submitPublicBooking(e);
     }
 
+    /* ─── Dev/test endpoint: seed / reset test data (no auth required) ─── */
+    if (action === 'seedTestData') {
+      return seedTestDataAction(e);
+    }
+
     /* Require valid GIS token + allow-list check for all other actions */
     var _ga = requireAuth(e);
     if (!_ga.valid) {
@@ -1018,6 +1023,91 @@ function debugTextOutput() {
   Logger.log('ContentService available: ' + (typeof ContentService !== 'undefined'));
   Logger.log('MimeType.JSON: ' + ContentService.MimeType.JSON);
   return output;
+}
+
+function seedTestData() {
+  /* ─── Call the standard seed to set up sheets + headers ─── */
+  var result = seedDatabase();
+
+  /* ─── Add additional test data spanning 2023-10 to 2024-09 ───
+     This gives you 12 months across 2 years to test:
+       Week / Month / Year / Custom / All-time presets. */
+  var spreadsheet = getSpreadsheet();
+  var now = formatDate(new Date());
+
+  /* ─── Additional Customers (with repeat bookings to test dedup) ─── */
+  var customersSheet = getSheet('Customers');
+  customersSheet.appendRow(['C0006', 'David Chen', 'david@example.com', '+639****1111', 'Quezon City', '', now]);
+  customersSheet.appendRow(['C0007', 'Maria Santos', 'maria@example.com', '+639****1234', 'Mandaluyong City', 'Repeat', now]);
+  /* C0007 is Maria again — a returning customer. The frontend should
+     NOT create a duplicate; the backend findOrCreateCustomer already
+     handles this by email. */
+
+  /* ─── Additional Bookings (spanning 11 months) ─── */
+  var bookingsSheet = getSheet('Bookings');
+  var extraBookings = [
+    ['B0006', 'C0001', 'Pablo Paraiso Pool House', '2023-10-15', '2023-10-17', 3, 12000, 'confirmed', '2023-09-20', 'Birthday',  10, '', '', now],
+    ['B0007', 'C0002', 'Pablo Paraiso Pool House', '2023-11-05', '2023-11-08', 4, 16000, 'confirmed', '2023-10-10', 'Pool Party', 20, '', '', now],
+    ['B0008', 'C0003', 'Pablo Paraiso Pool House', '2023-12-20', '2023-12-24', 5, 20000, 'confirmed', '2023-11-15', 'Christmas',  25, '', '', now],
+    ['B0009', 'C0003', 'Pablo Paraiso Pool House', '2023-12-28', '2024-01-01', 5, 20000, 'confirmed', '2023-12-01', 'New Year',   30, '', '', now],
+    ['B0010', 'C0001', 'Pablo Paraiso Pool House', '2024-01-20', '2024-01-22', 3, 12000, 'confirmed', '2024-01-01', 'Team Offsite', 12, '', '', now],
+    ['B0011', 'C0004', 'Pablo Paraiso Pool House', '2024-02-14', '2024-02-16', 3, 12000, 'confirmed', '2024-01-20', 'Valentine',  8, '', '', now],
+    ['B0012', 'C0005', 'Pablo Paraiso Pool House', '2024-03-08', '2024-03-12', 5, 20000, 'confirmed', '2024-02-15', 'Pool Party', 25, '', '', now],
+    ['B0013', 'C0006', 'Pablo Paraiso Pool House', '2024-04-10', '2024-04-12', 3, 12000, 'confirmed', '2024-03-20', 'Birthday',   15, '', '', now],
+    ['B0014', 'C0007', 'Pablo Paraiso Pool House', '2024-05-25', '2024-05-28', 4, 16000, 'confirmed', '2024-04-30', 'Graduation', 20, '', '', now],
+    ['B0015', 'C0002', 'Pablo Paraiso Pool House', '2024-06-15', '2024-06-18', 4, 16000, 'confirmed', '2024-05-10', 'Pool Party', 18, '', '', now],
+    ['B0016', 'C0003', 'Pablo Paraiso Pool House', '2024-07-01',  '2024-07-03', 3, 12000, 'confirmed', '2024-06-01', 'Birthday', 10, '', '', now],
+    ['B0017', 'C0004', 'Pablo Paraiso Pool House', '2024-08-12', '2024-08-15', 4, 16000, 'confirmed', '2024-07-01', 'Team Build', 20, '', '', now],
+    ['B0018', 'C0005', 'Pablo Paraiso Pool House', '2024-09-20', '2024-09-24', 5, 20000, 'confirmed', '2024-08-01', 'Pool Party', 25, '', '', now],
+  ];
+  extraBookings.forEach(function(b) { bookingsSheet.appendRow(b); });
+
+  /* ─── Additional Finances (income for each extra booking + expenses) ─── */
+  var financesSheet = getSheet('Finances');
+  var extras = [
+    ['F0011', '2023-10-15', 'income',  'Booking', 'Payment for B0006', 12000, 'B0006', now],
+    ['F0012', '2023-11-05', 'income',  'Booking', 'Payment for B0007', 16000, 'B0007', now],
+    ['F0013', '2023-12-20', 'income',  'Booking', 'Payment for B0008', 20000, 'B0008', now],
+    ['F0014', '2023-12-28', 'income',  'Booking', 'Payment for B0009', 20000, 'B0009', now],
+    ['F0015', '2023-11-10', 'expense', 'Cleaning', 'Monthly deep clean', 1500, '', now],
+    ['F0016', '2024-01-20', 'income',  'Booking', 'Payment for B0010', 12000, 'B0010', now],
+    ['F0017', '2024-02-14', 'income',  'Booking', 'Payment for B0011', 12000, 'B0011', now],
+    ['F0018', '2024-03-08', 'income',  'Booking', 'Payment for B0012', 20000, 'B0012', now],
+    ['F0019', '2024-04-10', 'income',  'Booking', 'Payment for B0013', 12000, 'B0013', now],
+    ['F0020', '2024-05-25', 'income',  'Booking', 'Payment for B0014', 16000, 'B0014', now],
+    ['F0021', '2024-06-15', 'income',  'Booking', 'Payment for B0015', 16000, 'B0015', now],
+    ['F0022', '2024-07-01', 'income',  'Booking', 'Payment for B0016', 12000, 'B0016', now],
+    ['F0023', '2024-08-12', 'income',  'Booking', 'Payment for B0017', 16000, 'B0017', now],
+    ['F0024', '2024-09-20', 'income',  'Booking', 'Payment for B0018', 20000, 'B0018', now],
+    ['F0025', '2024-06-15', 'expense', 'Utilities', 'Electricity and water', 3500, '', now],
+    ['F0026', '2024-09-20', 'expense', 'Supplies',  'Toiletries restock', 2500, '', now],
+  ];
+  extras.forEach(function(f) { financesSheet.appendRow(f); });
+
+  return {
+    success: true,
+    message: 'Database reset and re-seeded with test data spanning Oct 2023 – Sep 2024 ' +
+             '(18 customers, 18 bookings, 26 finances, 5 supplies).',
+    bookings: bookingsSheet.getLastRow() - 1,
+    customers: customersSheet.getLastRow() - 1,
+    finances: financesSheet.getLastRow() - 1,
+  };
+}
+
+/**
+ * Action wrapper for seedTestData — called from doPost via seedTestDataAction(e).
+ * Requires confirm=true parameter to prevent accidental data wipes.
+ */
+function seedTestDataAction(e) {
+  if (!e.parameter || e.parameter.confirm !== 'true') {
+    return sendJson({ success: false, error: 'Pass confirm=true to execute data reset.' }, 400);
+  }
+  try {
+    var result = seedTestData();
+    return sendSuccess(result);
+  } catch (err) {
+    return sendError(err.message || String(err), 500);
+  }
 }
 
 /* ==========================================================================

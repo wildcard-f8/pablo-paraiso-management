@@ -1,17 +1,17 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=29";
-import { api, auth } from "./auth.js?v=29";
-import { utils, $, $$ } from "./utils.js?v=29";
-import { createDashboard } from "./dashboard.js?v=29";
-import { createFinances } from "./finances.js?v=29";
-import { createCustomers } from "./customers.js?v=29";
-import { createBookings } from "./bookings.js?v=29";
-import { createCalendar } from "./calendar.js?v=29";
-import { createSupplies } from "./supplies.js?v=29";
-import { createWebsite } from "./website.js?v=29";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=29";
+import { CONFIG } from "./config.js?v=30";
+import { api, auth } from "./auth.js?v=30";
+import { utils, $, $$ } from "./utils.js?v=30";
+import { createDashboard } from "./dashboard.js?v=30";
+import { createFinances } from "./finances.js?v=30";
+import { createCustomers } from "./customers.js?v=30";
+import { createBookings } from "./bookings.js?v=30";
+import { createCalendar } from "./calendar.js?v=30";
+import { createSupplies } from "./supplies.js?v=30";
+import { createWebsite } from "./website.js?v=30";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=30";
 
 
 let currentParams = {};
@@ -100,6 +100,14 @@ const app = {
     if (importBtn) {
       importBtn.addEventListener("click", () => {
         app.importData();
+      });
+    }
+
+    /* Reset Test Data button — about page only */
+    const resetBtn = $("#resetTestDataBtn");
+    if (resetBtn) {
+      resetBtn.addEventListener("click", () => {
+        app.seedTestData(true);
       });
     }
   },
@@ -806,6 +814,24 @@ const app = {
       unitCost: 1200, lastOrdered: "2024-01-20", supplier: "ABC Supplier", minStock: 6,
     });
   },
+
+  /* ── Reset test data (dev/testing only) ── */
+  async seedTestData(confirm = true) {
+    if (!confirm) return;
+    try {
+      app.showToast("Resetting test data…", "info", 10000);
+      const result = await api.post("seedTestData", { confirm: true });
+      if (result && result.success) {
+        app.showToast(result.message || "Test data reset successfully.", "info", 8000);
+        api.clearCache();
+        app.refreshCurrentPage();
+      } else {
+        app.showToast(result?.error || "Reset failed.", "error", 8000);
+      }
+    } catch (err) {
+      app.showToast("Failed to reset test data: " + (err.message || "Unknown error"), "error", 8000);
+    }
+  },
 };
 
 function createAbout() {
@@ -825,8 +851,11 @@ function createAbout() {
       <li><strong>Backend</strong>: Google Apps Script (GAS) REST API.</li>
       <li><strong>Data</strong>: Google Sheets + Google Calendar.</li>
     </ul>
-    <h3>Endpoints</h3>
-    <p class="muted">See SPEC.md and <code>js/config.js</code> (API_BASE_URL + GOOGLE_CLIENT_ID).</p>
+    <h3>Testing</h3>
+    <p class="muted">Reset all sheet data and re-seed with fresh test data spanning Oct 2023 – Sep 2024 (18 customers, 18 bookings across 11 months, 26 finances, 5 supplies). Useful for testing date-range presets and the occupancy rate chart.</p>
+    <button class="btn btn--secondary" id="resetTestDataBtn" style="margin-top: 1rem;">
+      🔄 Reset Test Data
+    </button>
     <footer class="page-footer">Built for retreat hosts. Zero infrastructure cost.</footer>
   `;
   return el;
@@ -834,7 +863,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=29";
+export { utils, $, $$ } from "./utils.js?v=30";
 
 /* Export app and default */
 export { app };
