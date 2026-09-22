@@ -102,14 +102,6 @@ const app = {
         app.importData();
       });
     }
-
-    /* Reset Test Data button — about page only */
-    const resetBtn = $("#resetTestDataBtn");
-    if (resetBtn) {
-      resetBtn.addEventListener("click", () => {
-        app.seedTestData(true);
-      });
-    }
   },
 
   /* ── Page loading overlay ── */
@@ -814,24 +806,6 @@ const app = {
       unitCost: 1200, lastOrdered: "2024-01-20", supplier: "ABC Supplier", minStock: 6,
     });
   },
-
-  /* ── Reset test data (dev/testing only) ── */
-  async seedTestData(confirm = true) {
-    if (!confirm) return;
-    try {
-      app.showToast("Resetting test data…", "info", 10000);
-      const result = await api.post("seedTestData", { confirm: true });
-      if (result && result.success) {
-        app.showToast(result.message || "Test data reset successfully.", "info", 8000);
-        api.clearCache();
-        app.refreshCurrentPage();
-      } else {
-        app.showToast(result?.error || "Reset failed.", "error", 8000);
-      }
-    } catch (err) {
-      app.showToast("Failed to reset test data: " + (err.message || "Unknown error"), "error", 8000);
-    }
-  },
 };
 
 function createAbout() {
@@ -851,11 +825,8 @@ function createAbout() {
       <li><strong>Backend</strong>: Google Apps Script (GAS) REST API.</li>
       <li><strong>Data</strong>: Google Sheets + Google Calendar.</li>
     </ul>
-    <h3>Testing</h3>
-    <p class="muted">Reset all sheet data and re-seed with fresh test data spanning Oct 2023 – Sep 2024 (18 customers, 18 bookings across 11 months, 26 finances, 5 supplies). Useful for testing date-range presets and the occupancy rate chart.</p>
-    <button class="btn btn--secondary" id="resetTestDataBtn" style="margin-top: 1rem;">
-      🔄 Reset Test Data
-    </button>
+    <h3>Endpoints</h3>
+    <p class="muted">See SPEC.md and <code>js/config.js</code> (API_BASE_URL + GOOGLE_CLIENT_ID).</p>
     <footer class="page-footer">Built for retreat hosts. Zero infrastructure cost.</footer>
   `;
   return el;
