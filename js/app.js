@@ -191,6 +191,9 @@ const app = {
            "verifying…" spinner while we test the token against backend. */
         gate.classList.remove("auth-gate__hidden");
         gate.classList.remove("app-authed");
+        /* Clear any cached API responses from a previous session so we
+           don't serve stale data under the new token. */
+        api.clearCache();
         showVerifying();
 
         /* Probe the backend — a successful call proves the token is
@@ -275,6 +278,7 @@ const app = {
     /* Backend returned 403 — valid token but not on allow-list: sign out, show denied */
     document.addEventListener("auth:denied", (e) => {
       auth.signOut();  // clear token so gate shows "Sign in" button, not "Sign out"
+      api.clearCache(); // wipe any cached data from the rejected session
       app.showToast(e.detail?.message || "Access denied.", "error");
       hideVerifying();
       denied.style.display = "block";

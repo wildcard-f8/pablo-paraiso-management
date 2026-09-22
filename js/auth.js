@@ -177,7 +177,7 @@ function persistToken(token) {
  * Resolves with the raw `data` on success.
  * Rejects with an Error(message, {cause}) on failure.
  */
-export async function fetchGAS(action, { method = "GET", body = null, query = null } = {}) {
+export async function fetchGAS(action, { method = "GET", body = null, query = null } = {}, _retry = false) {
   const url = new URL(CONFIG.API_BASE_URL);
   url.searchParams.set("action", action);
   // Extra query params (e.g. start/end for getCalendarEvents) — set AFTER action
@@ -212,6 +212,14 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
   try {
     resp = await fetch(url.toString(), opts);
   } catch (networkErr) {
+    /* Network error — could be a CORS redirect failure from GAS's
+       302 → script.googleusercontent.com chain. Retry once after a
+       brief delay to let the GAS instance warm up. */
+    if (method === "GET" && !_retry) {
+      console.warn(`fetchGAS: retrying ${action} after network error —`, networkErr.message);
+      await new Promise((r) => setTimeout(r, 1000));
+      return fetchGAS(action, { method, body, query }, true);
+    }
     throw new Error(`Network error: ${networkErr.message}`, { cause: networkErr });
   }
 
@@ -220,6 +228,15 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
   try {
     payload = JSON.parse(text);
   } catch (_e) {
+    /* Non-JSON response — GAS may have redirected to a Google
+       anti-bot / "Please verify you're not a bot" page, or the 302
+       redirect URL expired. Retry once for GET requests after a
+       brief delay to let the GAS instance stabilise. */
+    if (method === "GET" && !_retry) {
+      console.warn(`fetchGAS: retrying ${action} after non-JSON (${resp.status}) —`, text.slice(0, 80));
+      await new Promise((r) => setTimeout(r, 1000));
+      return fetchGAS(action, { method, body, query }, true);
+    }
     throw new Error(`Backend returned non-JSON (${resp.status}): ${text.slice(0, 120)}`);
   }
 
@@ -323,6 +340,9 @@ export const api = {
     const key = cacheKey(action, query);
     /* Check in-memory first; if not there, try sessionStorage */
     return cacheGet(key) !== null;
+  },
+  clearCache() {
+    invalidateCache();
   },
   async get(action, query) {
     const key = cacheKey(action, query);
