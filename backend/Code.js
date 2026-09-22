@@ -1099,7 +1099,16 @@ function seedTestData() {
  * Requires confirm=true parameter to prevent accidental data wipes.
  */
 function seedTestDataAction(e) {
-  if (!e.parameter || e.parameter.confirm !== 'true') {
+  // Check confirm in query params (e.parameter) or POST body (e.postData)
+  var confirmed = false;
+  if (e.parameter && e.parameter.confirm === 'true') confirmed = true;
+  if (!confirmed && e.postData && e.postData.contents) {
+    try {
+      var body = JSON.parse(e.postData.contents);
+      if (body && body.confirm === true) confirmed = true;
+    } catch (jsonErr) { /* ignore parse errors */ }
+  }
+  if (!confirmed) {
     return sendJson({ success: false, error: 'Pass confirm=true to execute data reset.' }, 400);
   }
   try {
