@@ -3,9 +3,9 @@
    Model: {id,name,email,phone,address,notes}
    Note: firstRequest/lastRequest are computed from the Bookings sheet.
 */
-import { api } from "./auth.js?v=24";
-import { utils } from "./utils.js?v=24";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=24";
+import { api } from "./auth.js?v=25";
+import { utils } from "./utils.js?v=25";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=25";
 
 let container = null;
 let data = [];
@@ -114,12 +114,44 @@ async function loadCustomers() {
     api.get("getCustomers"),
     api.get("getBookings"),
   ]);
-  data = cust;
   bookings = bk;
-  // Compute first/last request dates per customer from bookings
-  data = data.map((c) => {
+
+  /* Deduplicate customers by email (case-insensitive), falling back to
+     normalised name, then raw id. A returning customer may have multiple
+     records in the sheet — we keep the first (by id) and collect every
+     id in the group so we can find *all* their bookings. Non-empty
+     fields from any duplicate are merged into the primary record. */
+  const groups = new Map();       // key → primary customer
+  const primaryIdOf = new Map();   // every customer id → primary id
+
+  cust.forEach((c) => {
+    const key = (c.email && c.email.trim()
+      ? c.email.trim().toLowerCase()
+      : c.name && c.name.trim()
+        ? c.name.trim().toLowerCase()
+        : c.id);
+    if (!groups.has(key)) {
+      groups.set(key, { ...c });
+    }
+    const primary = groups.get(key);
+    primaryIdOf.set(c.id, primary.id);
+    /* Merge non-empty fields from this record into the primary */
+    Object.keys(c).forEach((k) => {
+      if (c[k] && !primary[k]) { primary[k] = c[k]; }
+    });
+  });
+
+  /* Build a lookup: primaryId → [all ids in group] */
+  const idGroupMap = new Map();
+  primaryIdOf.forEach((pid, cid) => {
+    if (!idGroupMap.has(pid)) idGroupMap.set(pid, []);
+    idGroupMap.get(pid).push(cid);
+  });
+
+  data = Array.from(groups.values()).map((c) => {
+    const allIds = idGroupMap.get(c.id) || [c.id];
     const custBookings = bookings
-      .filter((b) => b.customerId === c.id && (b.createdAt || b.checkIn))
+      .filter((b) => allIds.includes(b.customerId) && (b.createdAt || b.checkIn))
       .map((b) => new Date(b.createdAt || b.checkIn))
       .filter((d) => !isNaN(d.getTime()));
     custBookings.sort((a, b) => a - b);
