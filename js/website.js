@@ -5,9 +5,9 @@
    Changes to the logo URL are saved to the backend Config sheet and
    immediately applied to both the website and the management app logo.
 */
-import { CONFIG } from "./config.js?v=17";
-import { api } from "./auth.js?v=17";
-import { utils, $, $$ } from "./utils.js?v=17";
+import { CONFIG } from "./config.js?v=18";
+import { api } from "./auth.js?v=18";
+import { utils, $, $$ } from "./utils.js?v=18";
 
 /* ── List-type sections: key → { fields, arrayField, layout } ── */
 const LIST_SECTIONS = {

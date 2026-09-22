@@ -1,17 +1,17 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=17";
-import { api, auth } from "./auth.js?v=17";
-import { utils, $, $$ } from "./utils.js?v=17";
-import { createDashboard } from "./dashboard.js?v=17";
-import { createFinances } from "./finances.js?v=17";
-import { createCustomers } from "./customers.js?v=17";
-import { createBookings } from "./bookings.js?v=17";
-import { createCalendar } from "./calendar.js?v=17";
-import { createSupplies } from "./supplies.js?v=17";
-import { createWebsite } from "./website.js?v=17";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=17";
+import { CONFIG } from "./config.js?v=18";
+import { api, auth } from "./auth.js?v=18";
+import { utils, $, $$ } from "./utils.js?v=18";
+import { createDashboard } from "./dashboard.js?v=18";
+import { createFinances } from "./finances.js?v=18";
+import { createCustomers } from "./customers.js?v=18";
+import { createBookings } from "./bookings.js?v=18";
+import { createCalendar } from "./calendar.js?v=18";
+import { createSupplies } from "./supplies.js?v=18";
+import { createWebsite } from "./website.js?v=18";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=18";
 
 
 let currentParams = {};
@@ -54,6 +54,26 @@ const app = {
       this.bindAuth();
       this.initTheme();
       this.initNotifications();
+      /* When the tab regains focus, silently refresh the token if needed.
+         This handles the "left open for hours" scenario: the periodic
+         check in auth.js should have refreshed proactively, but this
+         is a second line of defence. */
+      window.addEventListener("focus", () => {
+        if (auth.isAuthed()) {
+          auth.checkAndRefreshToken()
+            .then((token) => {
+              if (token) {
+                // Token was refreshed (or still valid) — verify with backend.
+                // If this fails, auth:required will fire and handle it.
+                api.get("getCustomers").catch(() => {});
+              }
+            })
+            .catch(() => {
+              // Silent refresh failed — the next API call will get 401
+              // and trigger auth:required (graceful overlay).
+            });
+        }
+      });
       this.parseHash();  // render initial route
     } catch (err) {
       console.error("App init error:", err);
@@ -214,20 +234,39 @@ const app = {
       }
     });
 
-    /* Backend returned 401 — token invalid/expired: sign out and reset the gate */
+    /* Backend returned 401 — token invalid/expired: sign out and show
+       a graceful "session expired" overlay so the user can re-sign in
+       without a full page reload, and without losing their page context. */
     document.addEventListener("auth:required", (e) => {
       /* Debounce: only handle the first auth:required until user re-signs-in */
       if (authErrorActive) return;
       authErrorActive = true;
       auth.signOut();  // clear stale token so the gate shows "Sign in"
-      /* No toast here — the user just signed in with Google, so a "please sign in"
-       * notification is confusing. The auth gate visually shows the sign-in button. */
       btn.classList.add("pulse");
       setTimeout(() => btn.classList.remove("pulse"), 6000);
       hideVerifying();
       syncGate();
-      /* Clear any dashboard content that may have started rendering */
-      $("#pageSlot").innerHTML = "";
+      /* Show a "session expired" overlay in the page slot instead of
+         blanking it entirely — preserves page context for when the
+         user re-authenticates. */
+      const slot = $("#pageSlot");
+      if (slot) {
+        slot.innerHTML = `
+          <div class="session-expired">
+            <div class="session-expired__content">
+              <h3>Session Expired</h3>
+              <p>Your session has expired for security reasons.</p>
+              <button class="btn btn--primary" id="reSignInBtn">
+                <span>Sign In Again</span>
+              </button>
+            </div>
+          </div>
+        `;
+        $("#reSignInBtn")?.addEventListener("click", () => {
+          authErrorActive = false;
+          auth.signIn();
+        });
+      }
     });
 
     /* Backend returned 403 — valid token but not on allow-list: sign out, show denied */
@@ -754,7 +793,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=17";
+export { utils, $, $$ } from "./utils.js?v=18";
 
 /* Export app and default */
 export { app };

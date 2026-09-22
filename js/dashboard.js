@@ -2,9 +2,9 @@
    Charts: revenue vs expenses (bar), booking income over time (line),
            expenses by category (doughnut), bookings by status (doughnut).
 */
-import { api } from "./auth.js?v=17";
-import { utils } from "./utils.js?v=17";
-import { CONFIG } from "./config.js?v=17";
+import { api } from "./auth.js?v=18";
+import { utils } from "./utils.js?v=18";
+import { CONFIG } from "./config.js?v=18";
 
 let charts = {};
 let dashboardRoot = null;
@@ -116,9 +116,13 @@ async function loadDashboard() {
     el("statCustomers", customers.length);
     el("statLowStock", lowStock.length);
 
-    document.getElementById("trendNet").textContent = net >= 0
-      ? `Net positive: ${utils.formatCurrency(net)}`
-      : `Net negative: ${utils.formatCurrency(Math.abs(net))}`;
+    const trendNet = document.getElementById("trendNet");
+    if (trendNet) {
+      trendNet.textContent = net >= 0
+        ? `Net positive: ${utils.formatCurrency(net)}`
+        : `Net negative: ${utils.formatCurrency(Math.abs(net))}`;
+      trendNet.className = "card__trend " + (net >= 0 ? "trend--positive" : "trend--negative");
+    }
 
     // Guard: if a newer dashboard load is in flight, skip this stale render
     if (myGeneration !== loadGeneration) return;

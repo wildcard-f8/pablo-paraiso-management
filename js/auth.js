@@ -9,7 +9,7 @@
    Usage: auth.init() boots GIS; auth.isAuthed() returns bool;
           auth.api(action, body) => Promise<data>.
 */
-import { CONFIG } from "./config.js?v=17";
+import { CONFIG } from "./config.js?v=18";
 
 const TOKEN_KEY = "paraiso_gis_token";
 
@@ -49,6 +49,32 @@ function initGis() {
   gisInitialized = true;
 }
 
+/* ─── Token expiry + auto-refresh ─── */
+/* GIS tokens (ID tokens) expire after ~1 hour. We decode the JWT's
+   exp field and silently refresh before expiry, so tabs left open
+   for hours don't lose their session. */
+
+/** Decodes the payload of a JWT (without verification) to read claims. */
+function decodeJwtPayload(token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = atob(payload);
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
+/** Returns true if the token expires within `bufferMin` minutes or can't be decoded. */
+function isTokenExpiringSoon(token, bufferMin = 5) {
+  const payload = decodeJwtPayload(token);
+  if (!payload || !payload.exp) return true;
+  const expMs = payload.exp * 1000;
+  return Date.now() >= expMs - bufferMin * 60_000;
+}
+
 export const auth = {
   isAuthed() {
     return !!idToken;
@@ -65,6 +91,16 @@ export const auth = {
     loadGisScript()
       .then(() => {
         initGis();
+        /* Periodic token refresh check — every 5 minutes, if the token
+           is expiring soon, silently get a new one. This keeps tabs open
+           for hours from losing their session. */
+        if (typeof window !== "undefined") {
+          setInterval(() => {
+            if (idToken && isTokenExpiringSoon(idToken)) {
+              tokenClient?.requestAccessToken({ prompt: "" });
+            }
+          }, 5 * 60 * 1000);
+        }
         if (idToken) {
           document.dispatchEvent(new CustomEvent("auth:changed", { detail: { authed: true } }));
         }
@@ -89,6 +125,40 @@ export const auth = {
       google.accounts.id.disableAutoSelect?.();
     }
     document.dispatchEvent(new CustomEvent("auth:changed", { detail: { authed: false } }));
+  },
+
+  /**
+   * If the current token is expiring within the next 5 minutes, silently
+   * request a new token via GIS (prompt: "" = no UI). Resolves with the
+   * (possibly refreshed) token. Rejects only if refresh fails.
+   */
+  async checkAndRefreshToken() {
+    const current = idToken || localStorage.getItem(TOKEN_KEY);
+    if (!current) return null;
+    if (!isTokenExpiringSoon(current)) return current; // still valid
+
+    if (!tokenClient) { if (!gisInitialized) initGis(); }
+    if (!tokenClient) throw new Error("Token client not available");
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error("Token refresh timed out"));
+      }, 8000);
+
+      const handler = (e) => {
+        cleanup();
+        if (e.detail && e.detail.authed && idToken) {
+          resolve(idToken);
+        } else {
+          reject(new Error("Token refresh failed"));
+        }
+      };
+      const cleanup = () => { clearTimeout(timeout); document.removeEventListener("auth:changed", handler); };
+
+      document.addEventListener("auth:changed", handler);
+      tokenClient.requestAccessToken({ prompt: "" }); // silent refresh
+    });
   },
 };
 
@@ -180,10 +250,11 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
 /** Convenience API object: get/post/del helpers around fetchGAS. */
 
 /* ─── Response cache ───
-   GET responses are cached for 60s so navigating between pages
+   GET responses are cached for 5 min so navigating between pages
    doesn't hit the GAS backend (cold-start ~1-2s) repeatedly.
-   POST/DELETE automatically invalidate the cache. */
-const CACHE_TTL_MS = 60_000;
+   POST/DELETE automatically invalidates the cache.
+   5 min strikes a balance between freshness and avoiding cold starts. */
+const CACHE_TTL_MS = 300_000;
 const cache = new Map(); // key → { data, timestamp }
 
 function cacheKey(action, query) {

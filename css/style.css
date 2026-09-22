@@ -523,6 +523,8 @@ p { margin: 0 0 var(--space-3); }
   word-break: break-word;
   overflow-wrap: break-word;
 }
+.card__trend.trend--positive { color: var(--color-success); }
+.card__trend.trend--negative { color: var(--color-danger); }
 @media (max-width: 500px) {
   .card__value { font-size: 1.15rem; }
   .card--stat { padding: var(--space-4); }
@@ -893,6 +895,18 @@ footer.page-footer {
   color: var(--color-text-muted);
   font-size: 0.8rem;
 }
+
+/* ── Session expired overlay ── */
+.session-expired {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  text-align: center;
+  padding: var(--space-6);
+}
+.session-expired__content h3 { font-size: 1.3rem; margin-bottom: var(--space-3); }
+.session-expired__content p { color: var(--color-text-dim); margin-bottom: var(--space-4); }
 
 /* ── Website content management ── */
 .website-grid {
