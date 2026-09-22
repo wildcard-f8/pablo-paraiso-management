@@ -1,17 +1,17 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=25";
-import { api, auth } from "./auth.js?v=25";
-import { utils, $, $$ } from "./utils.js?v=25";
-import { createDashboard } from "./dashboard.js?v=25";
-import { createFinances } from "./finances.js?v=25";
-import { createCustomers } from "./customers.js?v=25";
-import { createBookings } from "./bookings.js?v=25";
-import { createCalendar } from "./calendar.js?v=25";
-import { createSupplies } from "./supplies.js?v=25";
-import { createWebsite } from "./website.js?v=25";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=25";
+import { CONFIG } from "./config.js?v=26";
+import { api, auth } from "./auth.js?v=26";
+import { utils, $, $$ } from "./utils.js?v=26";
+import { createDashboard } from "./dashboard.js?v=26";
+import { createFinances } from "./finances.js?v=26";
+import { createCustomers } from "./customers.js?v=26";
+import { createBookings } from "./bookings.js?v=26";
+import { createCalendar } from "./calendar.js?v=26";
+import { createSupplies } from "./supplies.js?v=26";
+import { createWebsite } from "./website.js?v=26";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=26";
 
 
 let currentParams = {};
@@ -40,12 +40,8 @@ const app = {
       isFirstLoad = false;
       /* Only welcome + seed when the user is authenticated */
       if (auth.isAuthed()) {
-        this.showToast(`Welcome to ${CONFIG.APP_NAME}`, "info");
-        /* On first load, maybeSeed() may run. API responses are cached
-           (see auth.js cache), so by the time the dashboard loads its
-           own data, all GET calls are served from cache — no redundant
-           network round-trips to the GAS backend (which has cold-start
-           latency of ~1-2s). */
+        /* Seed only — no welcome toast; notifications are for
+           important events only (errors, new bookings, etc.) */
         this.maybeSeed();
       }
     });
@@ -834,7 +830,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=25";
+export { utils, $, $$ } from "./utils.js?v=26";
 
 /* Export app and default */
 export { app };

@@ -3,9 +3,9 @@
    Model: {id,name,email,phone,address,notes}
    Note: firstRequest/lastRequest are computed from the Bookings sheet.
 */
-import { api } from "./auth.js?v=25";
-import { utils } from "./utils.js?v=25";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=25";
+import { api } from "./auth.js?v=26";
+import { utils } from "./utils.js?v=26";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=26";
 
 let container = null;
 let data = [];
