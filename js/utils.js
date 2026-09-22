@@ -2,7 +2,7 @@
    Extracted from app.js so page modules can import utils
    without creating a circular dependency:  app ↔ dashboard.
 */
-import { CONFIG } from "./config.js?v=18";
+import { CONFIG } from "./config.js?v=19";
 
 export const $ = (sel, ctx = document) => ctx.querySelector(sel);
 export const $$ = (sel, ctx = document) => ctx.querySelectorAll(sel);
@@ -49,6 +49,44 @@ export const escapeHTML = (str) => {
     .replace(/'/g, "&#039;");
 };
 
+/**
+ * Safely parses a date string/number/Date into a Date object.
+ * Returns null if the value cannot be parsed.
+ */
+export const parseDateSafe = (val) => {
+  if (!val) return null;
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return null;
+    return d;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Filters an array of records to those whose dateField falls within [fromISO, toISO].
+ * Pass null/undefined for either bound to apply only one side.
+ * @param {Object[]} data
+ * @param {string} dateField - property name containing a date string
+ * @param {string|null} fromISO - start date (YYYY-MM-DD), inclusive
+ * @param {string|null} toISO - end date (YYYY-MM-DD), inclusive
+ * @return {Object[]}
+ */
+export const filterByDateRange = (data, dateField, fromISO, toISO) => {
+  if (!data || !data.length) return [];
+  if (!fromISO && !toISO) return data;
+  const from = fromISO ? new Date(fromISO + "T00:00:00") : null;
+  const to = toISO ? new Date(toISO + "T23:59:59") : null;
+  return data.filter((item) => {
+    const d = parseDateSafe(item[dateField]);
+    if (!d) return false;
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  });
+};
+
 /* Generic table builder used by CRUD pages */
 export const buildTable = (columns, rows, rowActions, emptyMsg = "No records.") => {
   const t = document.createElement("table");
@@ -88,6 +126,8 @@ export const utils = {
   confirm,
   escapeHTML,
   buildTable,
+  parseDateSafe,
+  filterByDateRange,
 };
 
 export default utils;

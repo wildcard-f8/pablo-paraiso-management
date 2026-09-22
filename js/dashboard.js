@@ -2,14 +2,20 @@
    Charts: revenue vs expenses (bar), booking income over time (line),
            expenses by category (doughnut), bookings by status (doughnut).
 */
-import { api } from "./auth.js?v=18";
-import { utils } from "./utils.js?v=18";
-import { CONFIG } from "./config.js?v=18";
+import { api } from "./auth.js?v=19";
+import { utils } from "./utils.js?v=19";
+import { CONFIG } from "./config.js?v=19";
 
 let charts = {};
 let dashboardRoot = null;
 let appRef = null;
 let loadGeneration = 0;
+let dashboardDateFrom = "";
+let dashboardDateTo = "";
+let cachedFinances = [];
+let cachedBookings = [];
+let cachedSupplies = [];
+let cachedCustomers = [];
 
 /* Resolve a CSS custom property to its actual computed value so Chart.js
    can use it. Chart.js does NOT understand CSS variables on its own —
@@ -38,6 +44,16 @@ export function createDashboard(_args, ref) {
   const section = document.createElement("section");
   section.className = "dashboard-page";
   section.innerHTML = `
+    <div class="toolbar">
+      <div class="date-range">
+        <label for="dashboardDateFrom">From</label>
+        <input type="date" id="dashboardDateFrom" />
+        <label for="dashboardDateTo">To</label>
+        <input type="date" id="dashboardDateTo" />
+        <button class="btn btn--ghost btn--sm" onclick="appClearDashboardDates()">Clear</button>
+      </div>
+    </div>
+
     <div class="stats-grid" id="statsGrid">
       <div class="card card--stat"><div class="card__label">Total Revenue</div><div class="card__value" id="statRevenue">—</div><div class="card__trend" id="trendRevenue"></div></div>
       <div class="card card--stat"><div class="card__label">Total Expenses</div><div class="card__value" id="statExpenses">—</div><div class="card__trend" id="trendExpenses"></div></div>
@@ -68,12 +84,24 @@ export function createDashboard(_args, ref) {
   `;
 
   // Capture the (still-detached) root so async data loads can query it.
-  // querySelector works on detached trees; the element is attached to the
-  // document by the router before the await resolves, so DOM queries that
-  // depend on being live in-document succeed.
   dashboardRoot = section;
   loadGeneration++;
   loadDashboard();
+
+  // Wire up date range inputs after the section is returned.
+  // We use a microtask so the element is in the document when querySelector runs.
+  setTimeout(() => {
+    const df = dashboardRoot.querySelector("#dashboardDateFrom");
+    const dt = dashboardRoot.querySelector("#dashboardDateTo");
+    if (df) df.addEventListener("change", (e) => {
+      dashboardDateFrom = e.target.value;
+      applyDashboardFilters();
+    });
+    if (dt) dt.addEventListener("change", (e) => {
+      dashboardDateTo = e.target.value;
+      applyDashboardFilters();
+    });
+  }, 0);
 
   section._unmount = function unmount() {
     Object.values(charts).forEach((c) => c.destroy());
@@ -96,37 +124,16 @@ async function loadDashboard() {
       api.get("getSupplies"),
     ]);
 
-    const income = finances.filter((f) => f.type === "income");
-    const expenses = finances.filter((f) => f.type === "expense");
-    const totalIncome = income.reduce((s, f) => s + Number(f.amount || 0), 0);
-    const totalExpenses = expenses.reduce((s, f) => s + Number(f.amount || 0), 0);
-    const net = totalIncome - totalExpenses;
-
-    const activeBookings = bookings.filter((b) => b.status === "confirmed");
-    const lowStock = supplies.filter((s) => Number(s.quantity || 0) <= Number(s.minStock || 0));
-
-    const el = (id, val, prefix = "") => {
-      const e = document.getElementById(id);
-      if (e) e.textContent = prefix + val;
-    };
-    el("statRevenue", utils.formatCurrency(totalIncome));
-    el("statExpenses", utils.formatCurrency(totalExpenses));
-    el("statNet", utils.formatCurrency(net));
-    el("statBookings", activeBookings.length);
-    el("statCustomers", customers.length);
-    el("statLowStock", lowStock.length);
-
-    const trendNet = document.getElementById("trendNet");
-    if (trendNet) {
-      trendNet.textContent = net >= 0
-        ? `Net positive: ${utils.formatCurrency(net)}`
-        : `Net negative: ${utils.formatCurrency(Math.abs(net))}`;
-      trendNet.className = "card__trend " + (net >= 0 ? "trend--positive" : "trend--negative");
-    }
-
-    // Guard: if a newer dashboard load is in flight, skip this stale render
+    // Guard: if a newer dashboard load was kicked off, abandon this one
     if (myGeneration !== loadGeneration) return;
-    renderCharts(finances, bookings, supplies, customers);
+
+    // Cache the full (unfiltered) data so date-range re-renders skip re-fetching
+    cachedFinances = finances;
+    cachedBookings = bookings;
+    cachedSupplies = supplies;
+    cachedCustomers = customers;
+
+    renderDashboard(cachedFinances, cachedBookings, cachedSupplies, cachedCustomers);
     appRef.hidePageLoader();
   } catch (err) {
     /* If the error is auth-related, the auth:required/auth:denied handler
@@ -141,13 +148,58 @@ async function loadDashboard() {
   }
 }
 
+function applyDashboardFilters() {
+  let f = cachedFinances, b = cachedBookings;
+  if (dashboardDateFrom || dashboardDateTo) {
+    f = utils.filterByDateRange(f, "date", dashboardDateFrom || null, dashboardDateTo || null);
+    b = utils.filterByDateRange(b, "checkIn", dashboardDateFrom || null, dashboardDateTo || null);
+  }
+  renderDashboard(f, b, cachedSupplies, cachedCustomers);
+}
+
+function renderDashboard(finances, bookings, supplies, customers) {
+  if (!dashboardRoot) return;
+  const slot = dashboardRoot.querySelector("#statsGrid");
+  if (!slot) return;
+
+  const income = finances.filter((f) => f.type === "income");
+  const expenses = finances.filter((f) => f.type === "expense");
+  const totalIncome = income.reduce((s, f) => s + Number(f.amount || 0), 0);
+  const totalExpenses = expenses.reduce((s, f) => s + Number(f.amount || 0), 0);
+  const net = totalIncome - totalExpenses;
+
+  const activeBookings = bookings.filter((b) => b.status === "confirmed");
+  const lowStock = supplies.filter((s) => Number(s.quantity || 0) <= Number(s.minStock || 0));
+
+  const el = (id, val, prefix = "") => {
+    const e = dashboardRoot.querySelector(`#${id}`);
+    if (e) e.textContent = prefix + val;
+  };
+  el("statRevenue", utils.formatCurrency(totalIncome));
+  el("statExpenses", utils.formatCurrency(totalExpenses));
+  el("statNet", utils.formatCurrency(net));
+  el("statBookings", activeBookings.length);
+  el("statCustomers", customers.length);
+  el("statLowStock", lowStock.length);
+
+  const trendNet = dashboardRoot.querySelector("#trendNet");
+  if (trendNet) {
+    trendNet.textContent = net >= 0
+      ? `Net positive: ${utils.formatCurrency(net)}`
+      : `Net negative: ${utils.formatCurrency(Math.abs(net))}`;
+    trendNet.className = "card__trend " + (net >= 0 ? "trend--positive" : "trend--negative");
+  }
+
+  renderCharts(finances, bookings, supplies, customers);
+}
+
 function renderCharts(finances, bookings, supplies, customers) {
   // Safety net: destroy any existing charts before creating new ones
   // (prevents "Canvas already in use" when the same canvas is reused)
   Object.values(charts).forEach((c) => { if (c) c.destroy(); });
   charts = {};
 
-  const ctx = (id) => document.getElementById(id);
+  const ctx = (id) => dashboardRoot && dashboardRoot.querySelector(`#${id}`);
   const C = chartColors();
 
   /* Chart 1: Revenue vs Expenses (bar) */
@@ -336,6 +388,16 @@ function renderCharts(finances, bookings, supplies, customers) {
     },
   });
 }
+
+window.appClearDashboardDates = function () {
+  dashboardDateFrom = "";
+  dashboardDateTo = "";
+  const df = document.getElementById("dashboardDateFrom");
+  const dt = document.getElementById("dashboardDateTo");
+  if (df) df.value = "";
+  if (dt) dt.value = "";
+  applyDashboardFilters();
+};
 
 export function refreshDashboard() {
   loadDashboard();

@@ -1,22 +1,28 @@
 /* customers.js - Table CRUD for Customer records.
    Endpoints: getCustomers, addCustomer, updateCustomer, deleteCustomer.
    Model: {id,name,email,phone,address,notes}
+   Note: firstRequest/lastRequest are computed from the Bookings sheet.
 */
-import { api } from "./auth.js?v=18";
-import { utils } from "./utils.js?v=18";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=18";
+import { api } from "./auth.js?v=19";
+import { utils } from "./utils.js?v=19";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=19";
 
 let container = null;
 let data = [];
-let searchTerm = "";
+let bookings = [];
 let appRef = null;
+let searchTerm = "";
 let sortState = null;
+let dateFrom = "";
+let dateTo = "";
 
 /* Column definitions with key/label/type for sorting */
 const COLUMNS = [
   { key: "name", label: "Name", type: "string" },
   { key: "email", label: "Email", type: "string" },
   { key: "phone", label: "Phone", type: "string" },
+  { key: "firstRequest", label: "First Request", type: "date" },
+  { key: "lastRequest", label: "Last Request", type: "date" },
   { key: "address", label: "Address", type: "string" },
 ];
 
@@ -26,7 +32,16 @@ export function createCustomers(_args, ref) {
   section.className = "customers-page";
   section.innerHTML = `
     <div class="toolbar">
-      <input class="search-box" id="customerSearch" placeholder="Search name, email, phone…" type="search" inputmode="search" />
+      <div class="actions">
+        <input class="search-box" id="customerSearch" placeholder="Search name, email, phone…" type="search" inputmode="search" />
+        <div class="date-range">
+          <label for="customerDateFrom">First Request From</label>
+          <input type="date" id="customerDateFrom" />
+          <label for="customerDateTo">First Request To</label>
+          <input type="date" id="customerDateTo" />
+          <button class="btn btn--ghost btn--sm" onclick="appClearCustomerDates()">Clear</button>
+        </div>
+      </div>
       <button class="btn btn--primary btn--sm" onclick="appAddCustomer()">＋ Add Customer</button>
     </div>
     <div class="card">
@@ -36,6 +51,14 @@ export function createCustomers(_args, ref) {
   container = section.querySelector("#customerTable");
   section.querySelector("#customerSearch").addEventListener("input", (e) => {
     searchTerm = e.target.value;
+    renderTable();
+  });
+  section.querySelector("#customerDateFrom").addEventListener("change", (e) => {
+    dateFrom = e.target.value;
+    renderTable();
+  });
+  section.querySelector("#customerDateTo").addEventListener("change", (e) => {
+    dateTo = e.target.value;
     renderTable();
   });
 
@@ -64,7 +87,25 @@ export function createCustomers(_args, ref) {
 }
 
 async function loadCustomers() {
-  data = await api.get("getCustomers");
+  const [cust, bk] = await Promise.all([
+    api.get("getCustomers"),
+    api.get("getBookings"),
+  ]);
+  data = cust;
+  bookings = bk;
+  // Compute first/last request dates per customer from bookings
+  data = data.map((c) => {
+    const custBookings = bookings
+      .filter((b) => b.customerId === c.id && (b.createdAt || b.checkIn))
+      .map((b) => new Date(b.createdAt || b.checkIn))
+      .filter((d) => !isNaN(d.getTime()));
+    custBookings.sort((a, b) => a - b);
+    return {
+      ...c,
+      firstRequest: custBookings.length ? custBookings[0].toISOString().split("T")[0] : "",
+      lastRequest: custBookings.length ? custBookings[custBookings.length - 1].toISOString().split("T")[0] : "",
+    };
+  });
   renderTable();
 }
 
@@ -72,12 +113,16 @@ function renderTable() {
   if (!container) return;
   const cols = COLUMNS;
   const term = searchTerm.toLowerCase();
-  const filtered = data.filter((c) =>
+  let filtered = data.filter((c) =>
     !term ||
     (c.name || "").toLowerCase().includes(term) ||
     (c.email || "").toLowerCase().includes(term) ||
     (c.phone || "").toLowerCase().includes(term)
   );
+  // Date range filter on firstRequest
+  if (dateFrom || dateTo) {
+    filtered = utils.filterByDateRange(filtered, "firstRequest", dateFrom || null, dateTo || null);
+  }
   const sorted = applySort(filtered, cols, sortState);
 
   const rows = sorted.map((c) => ({
@@ -85,6 +130,8 @@ function renderTable() {
     Name: utils.escapeHTML(c.name || ""),
     Email: utils.escapeHTML(c.email || ""),
     Phone: utils.escapeHTML(c.phone || ""),
+    "First Request": c.firstRequest ? utils.formatDate(c.firstRequest) : "—",
+    "Last Request": c.lastRequest ? utils.formatDate(c.lastRequest) : "—",
     Address: utils.escapeHTML(c.address || ""),
   }));
 
@@ -142,6 +189,16 @@ function customerFields(c) {
     { name: "notes", label: "Notes", tag: "textarea", default: c?.notes || "" },
   ];
 }
+
+window.appClearCustomerDates = function () {
+  dateFrom = "";
+  dateTo = "";
+  const df = document.getElementById("customerDateFrom");
+  const dt = document.getElementById("customerDateTo");
+  if (df) df.value = "";
+  if (dt) dt.value = "";
+  renderTable();
+};
 
 window.appAddCustomer = function () {
   appRef.openModal({

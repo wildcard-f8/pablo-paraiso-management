@@ -3,11 +3,11 @@
    Model: {id, customerId, property, checkIn, checkOut, nights, total, status}
    Single property: "Pablo Paraiso Pool House" (hardcoded — no Properties sheet).
 */
-import { api } from "./auth.js?v=18";
-import { utils } from "./utils.js?v=18";
-import { refreshDashboard } from "./dashboard.js?v=18";
-import { CONFIG } from "./config.js?v=18";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=18";
+import { api } from "./auth.js?v=19";
+import { utils } from "./utils.js?v=19";
+import { refreshDashboard } from "./dashboard.js?v=19";
+import { CONFIG } from "./config.js?v=19";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=19";
 
 const PROPERTY_NAME = "Pablo Paraiso Pool House";
 
@@ -15,6 +15,7 @@ const COLUMNS = [
   { key: "customer", label: "Customer", type: "string" },
   { key: "checkIn", label: "Check In", type: "date" },
   { key: "checkOut", label: "Check Out", type: "date" },
+  { key: "createdAt", label: "Booked On", type: "date" },
   { key: "nights", label: "Nights", type: "number" },
   { key: "total", label: "Total", type: "number" },
   { key: "status", label: "Status", type: "string" },
@@ -27,6 +28,8 @@ let customers = {};
 let searchTerm = "";
 let statusFilter = "all";
 let sortState = null;
+let dateFrom = "";
+let dateTo = "";
 
 export function createBookings(_args, ref) {
   appRef = ref;
@@ -42,6 +45,13 @@ export function createBookings(_args, ref) {
           <option value="pending">Pending</option>
           <option value="cancelled">Cancelled</option>
         </select>
+        <div class="date-range">
+          <label for="bookingDateFrom">From</label>
+          <input type="date" id="bookingDateFrom" />
+          <label for="bookingDateTo">To</label>
+          <input type="date" id="bookingDateTo" />
+          <button class="btn btn--ghost btn--sm" onclick="appClearBookingDates()">Clear</button>
+        </div>
       </div>
       <button class="btn btn--primary btn--sm" onclick="appAddBooking()">＋ Add Booking</button>
     </div>
@@ -56,6 +66,14 @@ export function createBookings(_args, ref) {
   });
   section.querySelector("#bookingStatusFilter").addEventListener("change", () => {
     statusFilter = section.querySelector("#bookingStatusFilter").value;
+    renderTable();
+  });
+  section.querySelector("#bookingDateFrom").addEventListener("change", (e) => {
+    dateFrom = e.target.value;
+    renderTable();
+  });
+  section.querySelector("#bookingDateTo").addEventListener("change", (e) => {
+    dateTo = e.target.value;
     renderTable();
   });
 
@@ -101,7 +119,11 @@ function renderTable() {
   if (!container) return;
   const cols = COLUMNS;
   const term = searchTerm.toLowerCase();
-  const filtered = data
+  let filtered = data;
+  if (dateFrom || dateTo) {
+    filtered = utils.filterByDateRange(filtered, "checkIn", dateFrom || null, dateTo || null);
+  }
+  filtered = filtered
     .filter((b) => {
       const matches =
         (customerName(b.customerId) || "").toLowerCase().includes(term) ||
@@ -118,6 +140,7 @@ function renderTable() {
     customer: customerName(b.customerId),
     checkIn: b.checkIn || "",
     checkOut: b.checkOut || "",
+    createdAt: b.createdAt || "",
     nights: b.nights ?? "",
     total: Number(b.total || 0),
     status: b.status || "",
@@ -268,6 +291,16 @@ window.appViewBookingInCalendar = function (id) {
   // navigate to calendar and open an informational toast
   window.location.hash = "#/calendar";
   setTimeout(() => appRef.showToast(`Find booking ${id} on the calendar.`, "info"), 300);
+};
+
+window.appClearBookingDates = function () {
+  dateFrom = "";
+  dateTo = "";
+  const df = document.getElementById("bookingDateFrom");
+  const dt = document.getElementById("bookingDateTo");
+  if (df) df.value = "";
+  if (dt) dt.value = "";
+  renderTable();
 };
 
 export async function refreshBookings() {

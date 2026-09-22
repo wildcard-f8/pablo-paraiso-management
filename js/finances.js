@@ -2,11 +2,11 @@
    Endpoint actions: getFinances, addFinance, updateFinance, deleteFinance.
    Model fields: id, date, type, category, description, amount, bookingId
 */
-import { api } from "./auth.js?v=18";
-import { utils } from "./utils.js?v=18";
-import { refreshDashboard } from "./dashboard.js?v=18";
-import { CONFIG } from "./config.js?v=18";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=18";
+import { api } from "./auth.js?v=19";
+import { utils } from "./utils.js?v=19";
+import { refreshDashboard } from "./dashboard.js?v=19";
+import { CONFIG } from "./config.js?v=19";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=19";
 
 let tableEl = null;
 let appRef = null;
@@ -15,6 +15,8 @@ let data = [];
 let filtered = [];
 let filterType = "all";
 let sortState = null;
+let dateFrom = "";
+let dateTo = "";
 
 /* Column definitions with key/label/type for sorting */
 const COLUMNS = [
@@ -39,6 +41,13 @@ export function createFinances(_args, ref) {
   section.innerHTML = `
     <div class="toolbar">
       <div class="actions">
+        <div class="date-range">
+          <label for="dateFrom">From</label>
+          <input type="date" id="dateFrom" />
+          <label for="dateTo">To</label>
+          <input type="date" id="dateTo" />
+          <button class="btn btn--ghost btn--sm" onclick="appClearFinanceDates()">Clear</button>
+        </div>
         <select id="filterType" class="filter-select">
           <option value="all">All</option>
           <option value="income">Income</option>
@@ -59,10 +68,18 @@ export function createFinances(_args, ref) {
   tableEl = section.querySelector("#tableContainer");
   section.querySelector("#filterType").addEventListener("change", () => {
     filterType = section.querySelector("#filterType").value;
-    renderTable();
+    applyFilters();
   });
   section.querySelector("#searchBox").addEventListener("input", (e) => {
     applySearch(e.target.value);
+  });
+  section.querySelector("#dateFrom").addEventListener("change", (e) => {
+    dateFrom = e.target.value;
+    applyFilters();
+  });
+  section.querySelector("#dateTo").addEventListener("change", (e) => {
+    dateTo = e.target.value;
+    applyFilters();
   });
 
   /* Sortable column headers */
@@ -95,20 +112,41 @@ export function createFinances(_args, ref) {
 
 async function loadFinances() {
   data = await api.get("getFinances");
-  filtered = [...data];
+  applyFilters();
+}
+
+function applyFilters() {
+  let result = data;
+  // Date range filter
+  if (dateFrom || dateTo) {
+    result = utils.filterByDateRange(result, "date", dateFrom || null, dateTo || null);
+  }
+  // Type filter
+  if (filterType !== "all") {
+    result = result.filter((f) => f.type === filterType);
+  }
+  filtered = result;
   renderTable();
   renderChart();
 }
 
 function applySearch(q) {
   const term = (q || "").toLowerCase();
-  filtered = data.filter(
+  if (!term) {
+    applyFilters();
+    return;
+  }
+  let result = filtered;
+  result = result.filter(
     (f) =>
-      (filterType === "all" || f.type === filterType) &&
-      (String(f.category || "").toLowerCase().includes(term) ||
-        String(f.description || "").toLowerCase().includes(term))
+      String(f.category || "").toLowerCase().includes(term) ||
+      String(f.description || "").toLowerCase().includes(term)
   );
+  // renderTable uses `filtered` — temporarily swap for search
+  const prev = filtered;
+  filtered = result;
   renderTable();
+  filtered = prev; // restore so date/type filters persist on next applyFilters
 }
 
 function renderTable() {
@@ -141,7 +179,6 @@ function renderTable() {
   headerRow.appendChild(actionsTh);
   thead.appendChild(headerRow);
   t.appendChild(thead);
-
   const tbody = document.createElement("tbody");
   if (!rows.length) {
     const tr = document.createElement("tr");
@@ -174,7 +211,7 @@ function renderChart() {
   if (!ctx) return;
   if (chart) chart.destroy();
 
-  const byCat = data.reduce((acc, f) => {
+  const byCat = filtered.reduce((acc, f) => {
     const cat = f.category || "Other";
     const amt = Number(f.amount || 0);
     if (!acc[cat]) acc[cat] = { income: 0, expense: 0 };
@@ -217,6 +254,16 @@ function renderChart() {
     },
   });
 }
+
+window.appClearFinanceDates = function () {
+  dateFrom = "";
+  dateTo = "";
+  const df = document.getElementById("dateFrom");
+  const dt = document.getElementById("dateTo");
+  if (df) df.value = "";
+  if (dt) dt.value = "";
+  applyFilters();
+};
 
 /* ---- Modal CRUD handlers (global for inline onclick) ---- */
 window.appAddFinance = function () {
