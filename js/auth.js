@@ -9,7 +9,7 @@
    Usage: auth.init() boots GIS; auth.isAuthed() returns bool;
           auth.api(action, body) => Promise<data>.
 */
-import { CONFIG } from "./config.js?v=32";
+import { CONFIG } from "./config.js?v=33";
 
 const TOKEN_KEY = "paraiso_gis_token";
 
@@ -37,7 +37,12 @@ function initGis() {
     client_id: CONFIG.GOOGLE_CLIENT_ID,
     scope: "openid email profile",
     callback: (response) => {
+      /* Debug: log what GIS returns — id_token vs access_token */
+      console.log('GIS callback received. id_token present:', !!response?.id_token,
+        'access_token present:', !!response?.access_token,
+        'all keys:', Object.keys(response));
       idToken = response?.id_token || response?.access_token || null;
+      console.log('Stored token type:', idToken && idToken.split('.').length === 3 ? 'JWT (id_token)' : idToken ? 'opaque (access_token)' : 'null');
       persistToken(idToken);
       document.dispatchEvent(new CustomEvent("auth:changed", { detail: { authed: !!idToken } }));
     },

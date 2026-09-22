@@ -848,18 +848,32 @@ function requireAuth(e) {
 
   try {
     var info = null;
-    var endpoints = [
-      'https://oauth2.googleapis.com/tokeninfo?id_token=' + token,
-      'https://oauth2.googleapis.com/tokeninfo?access_token=' + token
-    ];
+    var tokenIsJwt = token.split('.').length === 3;
+    /* Verify via id_token endpoint (for JWTs) or userinfo endpoint
+       (for OAuth access tokens). The userinfo endpoint is more reliable
+       for GIS access tokens, which tokeninfo?access_token= rejects. */
+    var endpoints = tokenIsJwt
+      ? [
+          'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token),
+          'https://www.googleapis.com/oauth2/v1/userinfo?access_token=' + encodeURIComponent(token),
+        ]
+      : [
+          'https://www.googleapis.com/oauth2/v1/userinfo?access_token=' + encodeURIComponent(token),
+          'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token),
+          'https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(token),
+        ];
     for (var i = 0; i < endpoints.length; i++) {
-      var response = UrlFetchApp.fetch(endpoints[i], { muteHttpExceptions: true });
-      var code = response.getResponseCode();
-      if (code === 200) {
-        info = JSON.parse(response.getContentText());
-        break;
+      try {
+        var response = UrlFetchApp.fetch(endpoints[i], { muteHttpExceptions: true });
+        var code = response.getResponseCode();
+        if (code === 200) {
+          info = JSON.parse(response.getContentText());
+          break;
+        }
+        console.log('requireAuth: endpoint ' + i + ' status=' + code + ' for action=' + (e.parameter && e.parameter.action));
+      } catch (fetchErr) {
+        console.log('requireAuth: endpoint ' + i + ' fetch error: ' + fetchErr.message);
       }
-      // 400 on this endpoint — try the other parameter
     }
     if (!info) {
       return { valid: false, email: null, status: 401, error: 'Invalid token. Please sign in again.' };
@@ -896,6 +910,53 @@ function doGet(e) {
      render dynamically without requiring user authentication. */
   if (action === 'getWebsiteContent') {
     return sendSuccess(getWebsiteContent(e.parameter.key));
+  }
+
+  /* Debug endpoint — checks token verification without auth */
+  if (action === 'debugAuth') {
+    var dbgToken = e.parameter._token;
+    if (!dbgToken) {
+      return sendJson({ success: true, data: { tokenReceived: false, message: 'No _token parameter provided' } });
+    }
+    var dbgInfo = null;
+    var dbgTokenIsJwt = dbgToken.split('.').length === 3;
+    var dbgEndpoints = dbgTokenIsJwt
+      ? [
+          'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(dbgToken),
+          'https://www.googleapis.com/oauth2/v1/userinfo?access_token=' + encodeURIComponent(dbgToken),
+        ]
+      : [
+          'https://www.googleapis.com/oauth2/v1/userinfo?access_token=' + encodeURIComponent(dbgToken),
+          'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(dbgToken),
+          'https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(dbgToken),
+        ];
+    var dbgResults = [];
+    for (var di = 0; di < dbgEndpoints.length; di++) {
+      try {
+        var dbgResp = UrlFetchApp.fetch(dbgEndpoints[di], { muteHttpExceptions: true });
+        var dbgCode = dbgResp.getResponseCode();
+        var dbgBody = dbgResp.getContentText().substring(0, 300);
+        dbgResults.push({ endpoint: dbgEndpoints[di].split('?')[0].replace('https://www.googleapis.com', 'https://oauth2.googleapis.com'), status: dbgCode, body: dbgCode === 200 ? JSON.parse(dbgBody) : dbgBody });
+        if (dbgCode === 200) {
+          dbgInfo = JSON.parse(dbgBody);
+          break;
+        }
+      } catch (dbgErr) {
+        dbgResults.push({ endpoint: di, error: dbgErr.message });
+      }
+    }
+    return sendJson({
+      success: true,
+      data: {
+        tokenReceived: true,
+        tokenLength: dbgToken.length,
+        tokenType: dbgTokenIsJwt ? 'jwt' : 'opaque',
+        verificationResults: dbgResults,
+        verifiedEmail: dbgInfo ? dbgInfo.email : null,
+        authorized: dbgInfo && dbgInfo.email ? isUserAuthorized(dbgInfo.email) : false,
+        authorizedUsers: getAuthorizedUsers(),
+      }
+    });
   }
 
   /* Require valid GIS token + allow-list check for all other actions */
