@@ -188,6 +188,46 @@ function persistToken(token) {
 /* ----------------------- API wrapper ----------------------- */
 
 /**
+ * XMLHttpRequest fallback for fetchGAS.
+ * Used when fetch() fails with "Failed to fetch" on GAS's cross-origin
+ * redirect chain (script.google.com → script.googleusercontent.com).
+ * XHR handles this redirect more reliably in some browsers.
+ */
+function _fetchGAS_XHR(url, _attempt) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", url);
+    xhr.timeout = 15000;
+    xhr.onload = () => {
+      /* XHR with CORS returns status 200 on success.
+         For cross-origin requests, status might be 0 if the redirect
+         chain succeeds but the CORS check fails on an intermediate response.
+         In that case, we still try to read the response text. */
+      if (xhr.status === 200 || (xhr.status === 0 && xhr.responseText)) {
+        resolve({
+          status: 200,
+          statusText: "OK",
+          text: () => Promise.resolve(xhr.responseText),
+        });
+      } else if (xhr.status === 0 && !xhr.responseText) {
+        /* Network error in XHR */
+        reject(new TypeError("Failed to fetch (XHR)"));
+      } else {
+        /* HTTP error status */
+        resolve({
+          status: xhr.status,
+          statusText: xhr.statusText,
+          text: () => Promise.resolve(xhr.responseText),
+        });
+      }
+    };
+    xhr.onerror = () => reject(new TypeError("Failed to fetch (XHR)"));
+    xhr.ontimeout = () => reject(new Error("XHR timeout"));
+    xhr.send();
+  });
+}
+
+/**
  * fetchGAS(action, {method, body, query})
  * Builds a request to the GAS endpoint, forwards the GIS token if present,
  * merges any extra `query` params alongside `action`, and unwraps the
@@ -233,30 +273,59 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
   /* AbortController timeout — prevents fetch() hanging indefinitely on
    * GAS cold starts that can take 10+ seconds */
   const _controller = new AbortController();
-  const _timeout = setTimeout(() => _controller.abort(), 15000);
+  const _timeout = setTimeout(() => {
+    console.warn('fetchGAS: 15s timeout reached for action=' + action);
+    _controller.abort();
+  }, 15000);
   opts.signal = _controller.signal;
 
   /*
    * --- Network error retry ---
    * GAS web app URLs redirect (302) to script.googleusercontent.com. On a
    * cold start, the redirect chain can fail or time out. Retry GET requests.
+   * Also: Chrome's fetch() in "cors" mode can fail on the cross-origin
+   * redirect chain (script.google.com → script.googleusercontent.com).
+   * XMLHttpRequest handles this redirect more reliably in some browsers.
    */
   let resp;
+  let _usedXHR = false;
   try {
-    if (_attempt === 0) console.log('fetchGAS:', method, url.toString().substring(0, 200) + (url.toString().length > 200 ? '...' : '') + ' (len=' + url.toString().length + ')');
+    if (_attempt === 0) console.log('fetchGAS: ' + method + ' ' + url.toString().substring(0, 200) + (url.toString().length > 200 ? '...' : '') + ' (len=' + url.toString().length + ')');
     resp = await fetch(url.toString(), opts);
     clearTimeout(_timeout);
     if (_attempt === 0) console.log('fetchGAS: response status=' + resp.status + ' for action=' + action);
   } catch (networkErr) {
     clearTimeout(_timeout);
-    if (method === "GET" && _attempt < RETRY_LIMIT) {
+    /* If fetch() failed with "Failed to fetch" and this was a GET, try XHR as a fallback.
+       XHR sometimes succeeds where fetch() fails for GAS's redirect chain. */
+    if (method === "GET" && _attempt === 0 && networkErr.message === "Failed to fetch") {
+      console.warn('fetchGAS: fetch() failed, trying XHR fallback for ' + action);
+      try {
+        resp = await _fetchGAS_XHR(url.toString(), _attempt);
+        _usedXHR = true;
+        console.log('fetchGAS: XHR fallback succeeded, status=' + resp.status + ' for action=' + action);
+        if (resp.status === 200 || resp.status === 0) {
+          /* XHR with CORS returns status 200 on success.
+             Status 0 with a response body means cross-origin redirect succeeded. */
+        }
+      } catch (xhrErr) {
+        console.error('fetchGAS: XHR fallback also failed:', xhrErr.message);
+        /* Fall through to retry/error handling below */
+      }
+    }
+    /* Retry on network error (excluding auth errors which come as JSON 401) */
+    if (!resp && method === "GET" && _attempt < RETRY_LIMIT) {
       if (_attempt === 0) {
-        console.warn(`fetchGAS: warming up backend for ${action} (attempt ${_attempt + 2}/${RETRY_LIMIT + 1})`);
+        console.warn('fetchGAS: warming up backend for ' + action + ' (attempt ' + (_attempt + 2) + '/' + (RETRY_LIMIT + 1) + ')');
       }
       await new Promise((r) => setTimeout(r, RETRY_DELAYS[_attempt]));
       return fetchGAS(action, { method, body, query }, _attempt + 1);
     }
-    throw new Error(`Network error: ${networkErr.message}`, { cause: networkErr });
+    /* If both fetch() and XHR failed and no retry, throw */
+    if (!resp) {
+      throw new Error('Network error: ' + networkErr.message + ' (url_len=' + url.toString().length + ', method=' + method + ', attempt=' + _attempt + ')', { cause: networkErr });
+    }
+    /* If XHR fallback succeeded, resp is set — continue to response processing */
   }
 
   const text = await resp.text();
