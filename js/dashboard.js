@@ -3,9 +3,9 @@
            expenses by category (doughnut), bookings by status (doughnut),
            occupancy rate over time (bar).
 */
-import { api } from "./auth.js?v=22";
-import { utils } from "./utils.js?v=22";
-import { CONFIG } from "./config.js?v=22";
+import { api } from "./auth.js?v=23";
+import { utils } from "./utils.js?v=23";
+import { CONFIG } from "./config.js?v=23";
 
 let charts = {};
 let dashboardRoot = null;
@@ -458,7 +458,7 @@ function renderOccupancyChart(canvasEl, bookings, C) {
     weeks[weekKey].bookedNights += nights;
   });
   const weekKeys = Object.keys(weeks).sort();
-  const data = weekKeys.map((k) => parseFloat((weeks[k].bookedNights / weeks[k].totalDays * 100).toFixed(1)));
+  const data = weekKeys.map((k) => parseFloat((weeks[k].bookedNights / weeks[k].totalDays * 100).toFixed(2)));
   return new Chart(canvasEl, {
     type: "bar",
     data: {

@@ -2,7 +2,7 @@
    Extracted from app.js so page modules can import utils
    without creating a circular dependency:  app ↔ dashboard.
 */
-import { CONFIG } from "./config.js?v=22";
+import { CONFIG } from "./config.js?v=23";
 
 export const $ = (sel, ctx = document) => ctx.querySelector(sel);
 export const $$ = (sel, ctx = document) => ctx.querySelectorAll(sel);
@@ -174,7 +174,7 @@ export const computeOccupancyRate = (bookings, fromISO, toISO) => {
     }
   });
   /* Return with one decimal place for precision */
-  return parseFloat(((bookedNights / totalDays) * 100).toFixed(1));
+  return parseFloat(((bookedNights / totalDays) * 100).toFixed(2));
 };
 
 /* Generic table builder used by CRUD pages */
