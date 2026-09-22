@@ -3,9 +3,9 @@
            expenses by category (doughnut), bookings by status (doughnut),
            occupancy rate over time (bar).
 */
-import { api } from "./auth.js?v=20";
-import { utils } from "./utils.js?v=20";
-import { CONFIG } from "./config.js?v=20";
+import { api } from "./auth.js?v=21";
+import { utils } from "./utils.js?v=21";
+import { CONFIG } from "./config.js?v=21";
 
 let charts = {};
 let dashboardRoot = null;
@@ -156,7 +156,7 @@ async function loadDashboard() {
     ]);
 
     // Guard: if a newer dashboard load was kicked off, abandon this one
-    if (myGeneration !== loadGeneration) return;
+    if (myGeneration !== loadGeneration) { appRef.hidePageLoader(); return; }
 
     // Cache the full (unfiltered) data so date-range re-renders skip re-fetching
     cachedFinances = finances;

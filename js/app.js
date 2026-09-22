@@ -1,17 +1,17 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=20";
-import { api, auth } from "./auth.js?v=20";
-import { utils, $, $$ } from "./utils.js?v=20";
-import { createDashboard } from "./dashboard.js?v=20";
-import { createFinances } from "./finances.js?v=20";
-import { createCustomers } from "./customers.js?v=20";
-import { createBookings } from "./bookings.js?v=20";
-import { createCalendar } from "./calendar.js?v=20";
-import { createSupplies } from "./supplies.js?v=20";
-import { createWebsite } from "./website.js?v=20";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=20";
+import { CONFIG } from "./config.js?v=21";
+import { api, auth } from "./auth.js?v=21";
+import { utils, $, $$ } from "./utils.js?v=21";
+import { createDashboard } from "./dashboard.js?v=21";
+import { createFinances } from "./finances.js?v=21";
+import { createCustomers } from "./customers.js?v=21";
+import { createBookings } from "./bookings.js?v=21";
+import { createCalendar } from "./calendar.js?v=21";
+import { createSupplies } from "./supplies.js?v=21";
+import { createWebsite } from "./website.js?v=21";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=21";
 
 
 let currentParams = {};
@@ -60,18 +60,14 @@ const app = {
          is a second line of defence. */
       window.addEventListener("focus", () => {
         if (auth.isAuthed()) {
-          auth.checkAndRefreshToken()
-            .then((token) => {
-              if (token) {
-                // Token was refreshed (or still valid) — verify with backend.
-                // If this fails, auth:required will fire and handle it.
-                api.get("getCustomers").catch(() => {});
-              }
-            })
-            .catch(() => {
-              // Silent refresh failed — the next API call will get 401
-              // and trigger auth:required (graceful overlay).
-            });
+          /* On tab focus, silently refresh token if needed. If the token
+             was refreshed, auth:changed fires and dispatches refreshData
+             to re-fetch the current page's data. No manual API call needed
+             here — the event chain handles it. */
+          auth.checkAndRefreshToken().catch(() => {
+            /* Silent refresh failed — the next API call will get 401
+               and trigger auth:required (graceful overlay). */
+          });
         }
       });
       this.parseHash();  // render initial route
@@ -185,8 +181,17 @@ const app = {
       const authed = e.detail && e.detail.authed;
       btn.classList.toggle("signed-in", authed);
       if (authed) {
+        const wasAuthed = gate.classList.contains("app-authed");
         authErrorActive = false;  // reset debounce flag
-        /* Show "verifying..." spinner while we test the token */
+        if (wasAuthed) {
+          /* Token was silently refreshed — user is already viewing the app.
+             Just refresh the current page's data instead of rebuilding
+             the whole view (which causes disruptive loading spinners). */
+          window.dispatchEvent(new CustomEvent("refreshData"));
+          return;
+        }
+        /* First-time sign-in (or token restore on page load): show
+           "verifying…" spinner while we test the token against backend. */
         gate.classList.remove("auth-gate__hidden");
         gate.classList.remove("app-authed");
         showVerifying();
@@ -794,7 +799,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=20";
+export { utils, $, $$ } from "./utils.js?v=21";
 
 /* Export app and default */
 export { app };
