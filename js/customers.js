@@ -3,9 +3,9 @@
    Model: {id,name,email,phone,address,notes}
    Note: firstRequest/lastRequest are computed from the Bookings sheet.
 */
-import { api } from "./auth.js?v=19";
-import { utils } from "./utils.js?v=19";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=19";
+import { api } from "./auth.js?v=20";
+import { utils } from "./utils.js?v=20";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=20";
 
 let container = null;
 let data = [];
@@ -15,6 +15,7 @@ let searchTerm = "";
 let sortState = null;
 let dateFrom = "";
 let dateTo = "";
+let datePreset = "";
 
 /* Column definitions with key/label/type for sorting */
 const COLUMNS = [
@@ -34,12 +35,21 @@ export function createCustomers(_args, ref) {
     <div class="toolbar">
       <div class="actions">
         <input class="search-box" id="customerSearch" placeholder="Search name, email, phone…" type="search" inputmode="search" />
-        <div class="date-range">
-          <label for="customerDateFrom">First Request From</label>
-          <input type="date" id="customerDateFrom" />
-          <label for="customerDateTo">First Request To</label>
-          <input type="date" id="customerDateTo" />
-          <button class="btn btn--ghost btn--sm" onclick="appClearCustomerDates()">Clear</button>
+        <div class="date-range-view">
+          <select class="view-select" id="customerDatePreset">
+            <option value="">All time</option>
+            <option value="week">Last 7 days</option>
+            <option value="month">Last 30 days</option>
+            <option value="year">Last 365 days</option>
+            <option value="custom">Custom range…</option>
+          </select>
+          <div class="date-custom" id="customerDateCustom">
+            <label for="customerDateFrom">First Request From</label>
+            <input type="date" id="customerDateFrom" />
+            <label for="customerDateTo">First Request To</label>
+            <input type="date" id="customerDateTo" />
+            <button class="btn btn--ghost btn--sm" onclick="appClearCustomerDates()">Clear</button>
+          </div>
         </div>
       </div>
       <button class="btn btn--primary btn--sm" onclick="appAddCustomer()">＋ Add Customer</button>
@@ -59,6 +69,18 @@ export function createCustomers(_args, ref) {
   });
   section.querySelector("#customerDateTo").addEventListener("change", (e) => {
     dateTo = e.target.value;
+    renderTable();
+  });
+  section.querySelector("#customerDatePreset").addEventListener("change", (e) => {
+    datePreset = e.target.value;
+    const customEl = section.querySelector("#customerDateCustom");
+    if (datePreset === "custom") {
+      customEl.classList.add("date-custom--visible");
+    } else {
+      customEl.classList.remove("date-custom--visible");
+      dateFrom = "";
+      dateTo = "";
+    }
     renderTable();
   });
 
@@ -120,8 +142,9 @@ function renderTable() {
     (c.phone || "").toLowerCase().includes(term)
   );
   // Date range filter on firstRequest
-  if (dateFrom || dateTo) {
-    filtered = utils.filterByDateRange(filtered, "firstRequest", dateFrom || null, dateTo || null);
+  const { from, to } = utils.computeDateRange(datePreset, dateFrom, dateTo);
+  if (from || to) {
+    filtered = utils.filterByDateRange(filtered, "firstRequest", from || null, to || null);
   }
   const sorted = applySort(filtered, cols, sortState);
 
@@ -191,10 +214,15 @@ function customerFields(c) {
 }
 
 window.appClearCustomerDates = function () {
+  datePreset = "";
   dateFrom = "";
   dateTo = "";
+  const presetEl = document.getElementById("customerDatePreset");
+  const customEl = document.getElementById("customerDateCustom");
   const df = document.getElementById("customerDateFrom");
   const dt = document.getElementById("customerDateTo");
+  if (presetEl) presetEl.value = "";
+  if (customEl) customEl.classList.remove("date-custom--visible");
   if (df) df.value = "";
   if (dt) dt.value = "";
   renderTable();

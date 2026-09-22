@@ -2,11 +2,11 @@
    Endpoint actions: getFinances, addFinance, updateFinance, deleteFinance.
    Model fields: id, date, type, category, description, amount, bookingId
 */
-import { api } from "./auth.js?v=19";
-import { utils } from "./utils.js?v=19";
-import { refreshDashboard } from "./dashboard.js?v=19";
-import { CONFIG } from "./config.js?v=19";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=19";
+import { api } from "./auth.js?v=20";
+import { utils } from "./utils.js?v=20";
+import { refreshDashboard } from "./dashboard.js?v=20";
+import { CONFIG } from "./config.js?v=20";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=20";
 
 let tableEl = null;
 let appRef = null;
@@ -17,6 +17,7 @@ let filterType = "all";
 let sortState = null;
 let dateFrom = "";
 let dateTo = "";
+let datePreset = "";
 
 /* Column definitions with key/label/type for sorting */
 const COLUMNS = [
@@ -41,12 +42,21 @@ export function createFinances(_args, ref) {
   section.innerHTML = `
     <div class="toolbar">
       <div class="actions">
-        <div class="date-range">
-          <label for="dateFrom">From</label>
-          <input type="date" id="dateFrom" />
-          <label for="dateTo">To</label>
-          <input type="date" id="dateTo" />
-          <button class="btn btn--ghost btn--sm" onclick="appClearFinanceDates()">Clear</button>
+        <div class="date-range-view">
+          <select class="view-select" id="financeDatePreset">
+            <option value="">All time</option>
+            <option value="week">Last 7 days</option>
+            <option value="month">Last 30 days</option>
+            <option value="year">Last 365 days</option>
+            <option value="custom">Custom range…</option>
+          </select>
+          <div class="date-custom" id="financeDateCustom">
+            <label for="dateFrom">From</label>
+            <input type="date" id="dateFrom" />
+            <label for="dateTo">To</label>
+            <input type="date" id="dateTo" />
+            <button class="btn btn--ghost btn--sm" onclick="appClearFinanceDates()">Clear</button>
+          </div>
         </div>
         <select id="filterType" class="filter-select">
           <option value="all">All</option>
@@ -72,6 +82,18 @@ export function createFinances(_args, ref) {
   });
   section.querySelector("#searchBox").addEventListener("input", (e) => {
     applySearch(e.target.value);
+  });
+  section.querySelector("#financeDatePreset").addEventListener("change", (e) => {
+    datePreset = e.target.value;
+    const customEl = section.querySelector("#financeDateCustom");
+    if (datePreset === "custom") {
+      customEl.classList.add("date-custom--visible");
+    } else {
+      customEl.classList.remove("date-custom--visible");
+      dateFrom = "";
+      dateTo = "";
+    }
+    applyFilters();
   });
   section.querySelector("#dateFrom").addEventListener("change", (e) => {
     dateFrom = e.target.value;
@@ -117,9 +139,10 @@ async function loadFinances() {
 
 function applyFilters() {
   let result = data;
-  // Date range filter
-  if (dateFrom || dateTo) {
-    result = utils.filterByDateRange(result, "date", dateFrom || null, dateTo || null);
+  // Date range filter (supports Week/Month/Year/Custom presets)
+  const { from, to } = utils.computeDateRange(datePreset, dateFrom, dateTo);
+  if (from || to) {
+    result = utils.filterByDateRange(result, "date", from || null, to || null);
   }
   // Type filter
   if (filterType !== "all") {
@@ -256,10 +279,15 @@ function renderChart() {
 }
 
 window.appClearFinanceDates = function () {
+  datePreset = "";
   dateFrom = "";
   dateTo = "";
+  const presetEl = document.getElementById("financeDatePreset");
+  const customEl = document.getElementById("financeDateCustom");
   const df = document.getElementById("dateFrom");
   const dt = document.getElementById("dateTo");
+  if (presetEl) presetEl.value = "";
+  if (customEl) customEl.classList.remove("date-custom--visible");
   if (df) df.value = "";
   if (dt) dt.value = "";
   applyFilters();

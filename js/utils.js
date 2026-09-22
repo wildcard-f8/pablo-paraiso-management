@@ -2,7 +2,7 @@
    Extracted from app.js so page modules can import utils
    without creating a circular dependency:  app ↔ dashboard.
 */
-import { CONFIG } from "./config.js?v=19";
+import { CONFIG } from "./config.js?v=20";
 
 export const $ = (sel, ctx = document) => ctx.querySelector(sel);
 export const $$ = (sel, ctx = document) => ctx.querySelectorAll(sel);
@@ -87,6 +87,69 @@ export const filterByDateRange = (data, dateField, fromISO, toISO) => {
   });
 };
 
+/** Returns today's date as YYYY-MM-DD (ISO local). */
+export const todayISO = () => formatDateISO(new Date());
+
+/** Returns the date N days ago as YYYY-MM-DD. */
+export const daysAgoISO = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return formatDateISO(d);
+};
+
+/**
+ * Computes a { from, to } date range (YYYY-MM-DD) from a preset name.
+ * "custom" returns { from: customFrom, to: customTo }.
+ * Empty/invalid preset returns { from: "", to: "" } (show everything).
+ */
+export const computeDateRange = (preset, customFrom = "", customTo = "") => {
+  switch (preset) {
+    case "week":
+      return { from: daysAgoISO(7), to: todayISO() };
+    case "month":
+      return { from: daysAgoISO(30), to: todayISO() };
+    case "year":
+      return { from: daysAgoISO(365), to: todayISO() };
+    case "custom":
+    default:
+      return { from: customFrom || "", to: customTo || "" };
+  }
+};
+
+/**
+ * Computes occupancy rate (%) from a list of bookings within a date range.
+ * Counts booked nights (checkIn..checkOut) that fall within [fromISO, toISO],
+ * divided by total available days in that range.
+ * @param {Object[]} bookings - each has checkIn, checkOut, status
+ * @param {string|null} fromISO - period start (YYYY-MM-DD)
+ * @param {string|null} toISO - period end (YYYY-MM-DD)
+ * @return {number} occupancy percentage 0–100
+ */
+export const computeOccupancyRate = (bookings, fromISO, toISO) => {
+  if (!bookings || !bookings.length) return 0;
+  const from = fromISO ? new Date(fromISO + "T00:00:00") : null;
+  if (!from) return 0;
+  const to = toISO ? new Date(toISO + "T23:59:59") : new Date(fromISO + "T23:59:59");
+  // Total available days in the period
+  const totalDays = Math.ceil((to - from) / (1000 * 60 * 60 * 24)) + 1;
+  if (totalDays <= 0) return 0;
+  // Count booked nights within the period
+  let bookedNights = 0;
+  bookings.forEach((b) => {
+    if (b.status === "cancelled") return;
+    const cin = parseDateSafe(b.checkIn);
+    const cout = parseDateSafe(b.checkOut);
+    if (!cin || !cout) return;
+    // Clamp booking dates to the period boundaries
+    const start = cin < from ? from : cin;
+    const end = cout > to ? to : cout;
+    if (start <= end) {
+      bookedNights += Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    }
+  });
+  return Math.round((bookedNights / totalDays) * 100);
+};
+
 /* Generic table builder used by CRUD pages */
 export const buildTable = (columns, rows, rowActions, emptyMsg = "No records.") => {
   const t = document.createElement("table");
@@ -128,6 +191,10 @@ export const utils = {
   buildTable,
   parseDateSafe,
   filterByDateRange,
+  todayISO,
+  daysAgoISO,
+  computeDateRange,
+  computeOccupancyRate,
 };
 
 export default utils;

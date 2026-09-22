@@ -3,11 +3,11 @@
    Model: {id, customerId, property, checkIn, checkOut, nights, total, status}
    Single property: "Pablo Paraiso Pool House" (hardcoded — no Properties sheet).
 */
-import { api } from "./auth.js?v=19";
-import { utils } from "./utils.js?v=19";
-import { refreshDashboard } from "./dashboard.js?v=19";
-import { CONFIG } from "./config.js?v=19";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=19";
+import { api } from "./auth.js?v=20";
+import { utils } from "./utils.js?v=20";
+import { refreshDashboard } from "./dashboard.js?v=20";
+import { CONFIG } from "./config.js?v=20";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=20";
 
 const PROPERTY_NAME = "Pablo Paraiso Pool House";
 
@@ -30,6 +30,7 @@ let statusFilter = "all";
 let sortState = null;
 let dateFrom = "";
 let dateTo = "";
+let datePreset = "";
 
 export function createBookings(_args, ref) {
   appRef = ref;
@@ -45,12 +46,21 @@ export function createBookings(_args, ref) {
           <option value="pending">Pending</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <div class="date-range">
-          <label for="bookingDateFrom">From</label>
-          <input type="date" id="bookingDateFrom" />
-          <label for="bookingDateTo">To</label>
-          <input type="date" id="bookingDateTo" />
-          <button class="btn btn--ghost btn--sm" onclick="appClearBookingDates()">Clear</button>
+        <div class="date-range-view">
+          <select class="view-select" id="bookingDatePreset">
+            <option value="">All time</option>
+            <option value="week">Last 7 days</option>
+            <option value="month">Last 30 days</option>
+            <option value="year">Last 365 days</option>
+            <option value="custom">Custom range…</option>
+          </select>
+          <div class="date-custom" id="bookingDateCustom">
+            <label for="bookingDateFrom">From</label>
+            <input type="date" id="bookingDateFrom" />
+            <label for="bookingDateTo">To</label>
+            <input type="date" id="bookingDateTo" />
+            <button class="btn btn--ghost btn--sm" onclick="appClearBookingDates()">Clear</button>
+          </div>
         </div>
       </div>
       <button class="btn btn--primary btn--sm" onclick="appAddBooking()">＋ Add Booking</button>
@@ -74,6 +84,18 @@ export function createBookings(_args, ref) {
   });
   section.querySelector("#bookingDateTo").addEventListener("change", (e) => {
     dateTo = e.target.value;
+    renderTable();
+  });
+  section.querySelector("#bookingDatePreset").addEventListener("change", (e) => {
+    datePreset = e.target.value;
+    const customEl = section.querySelector("#bookingDateCustom");
+    if (datePreset === "custom") {
+      customEl.classList.add("date-custom--visible");
+    } else {
+      customEl.classList.remove("date-custom--visible");
+      dateFrom = "";
+      dateTo = "";
+    }
     renderTable();
   });
 
@@ -120,8 +142,9 @@ function renderTable() {
   const cols = COLUMNS;
   const term = searchTerm.toLowerCase();
   let filtered = data;
-  if (dateFrom || dateTo) {
-    filtered = utils.filterByDateRange(filtered, "checkIn", dateFrom || null, dateTo || null);
+  const { from, to } = utils.computeDateRange(datePreset, dateFrom, dateTo);
+  if (from || to) {
+    filtered = utils.filterByDateRange(filtered, "checkIn", from || null, to || null);
   }
   filtered = filtered
     .filter((b) => {
@@ -294,10 +317,15 @@ window.appViewBookingInCalendar = function (id) {
 };
 
 window.appClearBookingDates = function () {
+  datePreset = "";
   dateFrom = "";
   dateTo = "";
+  const presetEl = document.getElementById("bookingDatePreset");
+  const customEl = document.getElementById("bookingDateCustom");
   const df = document.getElementById("bookingDateFrom");
   const dt = document.getElementById("bookingDateTo");
+  if (presetEl) presetEl.value = "";
+  if (customEl) customEl.classList.remove("date-custom--visible");
   if (df) df.value = "";
   if (dt) dt.value = "";
   renderTable();

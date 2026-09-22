@@ -1,15 +1,17 @@
 /* dashboard.js - Dashboard: summary cards + Chart.js visuals.
    Charts: revenue vs expenses (bar), booking income over time (line),
-           expenses by category (doughnut), bookings by status (doughnut).
+           expenses by category (doughnut), bookings by status (doughnut),
+           occupancy rate over time (bar).
 */
-import { api } from "./auth.js?v=19";
-import { utils } from "./utils.js?v=19";
-import { CONFIG } from "./config.js?v=19";
+import { api } from "./auth.js?v=20";
+import { utils } from "./utils.js?v=20";
+import { CONFIG } from "./config.js?v=20";
 
 let charts = {};
 let dashboardRoot = null;
 let appRef = null;
 let loadGeneration = 0;
+let datePreset = ""; // "", "week", "month", "year", "custom"
 let dashboardDateFrom = "";
 let dashboardDateTo = "";
 let cachedFinances = [];
@@ -39,18 +41,31 @@ function chartColors() {
   };
 }
 
+function resolveDateRange() {
+  return utils.computeDateRange(datePreset, dashboardDateFrom, dashboardDateTo);
+}
+
 export function createDashboard(_args, ref) {
   appRef = ref;
   const section = document.createElement("section");
   section.className = "dashboard-page";
   section.innerHTML = `
     <div class="toolbar">
-      <div class="date-range">
-        <label for="dashboardDateFrom">From</label>
-        <input type="date" id="dashboardDateFrom" />
-        <label for="dashboardDateTo">To</label>
-        <input type="date" id="dashboardDateTo" />
-        <button class="btn btn--ghost btn--sm" onclick="appClearDashboardDates()">Clear</button>
+      <div class="date-range-view">
+        <select class="view-select" id="dashboardDatePreset">
+          <option value="">All time</option>
+          <option value="week">Last 7 days</option>
+          <option value="month">Last 30 days</option>
+          <option value="year">Last 365 days</option>
+          <option value="custom">Custom range…</option>
+        </select>
+        <div class="date-custom" id="dashboardDateCustom">
+          <label for="dashboardDateFrom">From</label>
+          <input type="date" id="dashboardDateFrom" />
+          <label for="dashboardDateTo">To</label>
+          <input type="date" id="dashboardDateTo" />
+          <button class="btn btn--ghost btn--sm" onclick="appClearDashboardDates()">Clear</button>
+        </div>
       </div>
     </div>
 
@@ -58,6 +73,7 @@ export function createDashboard(_args, ref) {
       <div class="card card--stat"><div class="card__label">Total Revenue</div><div class="card__value" id="statRevenue">—</div><div class="card__trend" id="trendRevenue"></div></div>
       <div class="card card--stat"><div class="card__label">Total Expenses</div><div class="card__value" id="statExpenses">—</div><div class="card__trend" id="trendExpenses"></div></div>
       <div class="card card--stat"><div class="card__label">Net Profit</div><div class="card__value" id="statNet">—</div><div class="card__trend" id="trendNet"></div></div>
+      <div class="card card--stat"><div class="card__label">Occupancy Rate</div><div class="card__value" id="statOccupancy">—</div><div class="card__trend" id="trendOccupancy"></div></div>
       <div class="card card--stat"><div class="card__label">Active Bookings</div><div class="card__value" id="statBookings">—</div><div class="card__trend" id="trendBookings"></div></div>
       <div class="card card--stat"><div class="card__label">Customers</div><div class="card__value" id="statCustomers">—</div><div class="card__trend" id="trendCustomers"></div></div>
       <div class="card card--stat"><div class="card__label">Low Stock Items</div><div class="card__value" id="statLowStock">—</div><div class="card__trend" id="trendLowStock"></div></div>
@@ -77,6 +93,10 @@ export function createDashboard(_args, ref) {
         <canvas id="chartBookingIncome" height="240"></canvas>
       </div>
       <div class="card chart-card">
+        <h3>Occupancy Rate Over Time</h3>
+        <canvas id="chartOccupancy" height="240"></canvas>
+      </div>
+      <div class="card chart-card">
         <h3>Bookings by Status</h3>
         <canvas id="chartBookingsStatus" height="240"></canvas>
       </div>
@@ -88,11 +108,24 @@ export function createDashboard(_args, ref) {
   loadGeneration++;
   loadDashboard();
 
-  // Wire up date range inputs after the section is returned.
-  // We use a microtask so the element is in the document when querySelector runs.
+  // Wire up view selector + date inputs after the section is attached.
   setTimeout(() => {
+    const presetEl = dashboardRoot.querySelector("#dashboardDatePreset");
+    const customEl = dashboardRoot.querySelector("#dashboardDateCustom");
     const df = dashboardRoot.querySelector("#dashboardDateFrom");
     const dt = dashboardRoot.querySelector("#dashboardDateTo");
+
+    if (presetEl) presetEl.addEventListener("change", (e) => {
+      datePreset = e.target.value;
+      if (datePreset === "custom") {
+        customEl.classList.add("date-custom--visible");
+      } else {
+        customEl.classList.remove("date-custom--visible");
+        dashboardDateFrom = "";
+        dashboardDateTo = "";
+      }
+      applyDashboardFilters();
+    });
     if (df) df.addEventListener("change", (e) => {
       dashboardDateFrom = e.target.value;
       applyDashboardFilters();
@@ -113,8 +146,6 @@ export function createDashboard(_args, ref) {
 
 async function loadDashboard() {
   const myGeneration = loadGeneration;
-  const slot = dashboardRoot && dashboardRoot.querySelector("#statsGrid");
-  if (!slot) return;
   appRef.showPageLoader("Loading dashboard…");
   try {
     const [finances, bookings, customers, supplies] = await Promise.all([
@@ -149,10 +180,11 @@ async function loadDashboard() {
 }
 
 function applyDashboardFilters() {
+  const { from, to } = resolveDateRange();
   let f = cachedFinances, b = cachedBookings;
-  if (dashboardDateFrom || dashboardDateTo) {
-    f = utils.filterByDateRange(f, "date", dashboardDateFrom || null, dashboardDateTo || null);
-    b = utils.filterByDateRange(b, "checkIn", dashboardDateFrom || null, dashboardDateTo || null);
+  if (from || to) {
+    f = utils.filterByDateRange(f, "date", from || null, to || null);
+    b = utils.filterByDateRange(b, "checkIn", from || null, to || null);
   }
   renderDashboard(f, b, cachedSupplies, cachedCustomers);
 }
@@ -161,6 +193,8 @@ function renderDashboard(finances, bookings, supplies, customers) {
   if (!dashboardRoot) return;
   const slot = dashboardRoot.querySelector("#statsGrid");
   if (!slot) return;
+
+  const { from, to } = resolveDateRange();
 
   const income = finances.filter((f) => f.type === "income");
   const expenses = finances.filter((f) => f.type === "expense");
@@ -171,6 +205,9 @@ function renderDashboard(finances, bookings, supplies, customers) {
   const activeBookings = bookings.filter((b) => b.status === "confirmed");
   const lowStock = supplies.filter((s) => Number(s.quantity || 0) <= Number(s.minStock || 0));
 
+  // Occupancy rate for the current period
+  const occupancy = utils.computeOccupancyRate(bookings, from || null, to || null);
+
   const el = (id, val, prefix = "") => {
     const e = dashboardRoot.querySelector(`#${id}`);
     if (e) e.textContent = prefix + val;
@@ -178,6 +215,7 @@ function renderDashboard(finances, bookings, supplies, customers) {
   el("statRevenue", utils.formatCurrency(totalIncome));
   el("statExpenses", utils.formatCurrency(totalExpenses));
   el("statNet", utils.formatCurrency(net));
+  el("statOccupancy", `${occupancy}%`);
   el("statBookings", activeBookings.length);
   el("statCustomers", customers.length);
   el("statLowStock", lowStock.length);
@@ -188,6 +226,14 @@ function renderDashboard(finances, bookings, supplies, customers) {
       ? `Net positive: ${utils.formatCurrency(net)}`
       : `Net negative: ${utils.formatCurrency(Math.abs(net))}`;
     trendNet.className = "card__trend " + (net >= 0 ? "trend--positive" : "trend--negative");
+  }
+
+  const trendOcc = dashboardRoot.querySelector("#trendOccupancy");
+  if (trendOcc) {
+    trendOcc.textContent = occupancy > 0
+      ? `${occupancy}% occupied in selected period`
+      : "No bookings in period";
+    trendOcc.className = "card__trend " + (occupancy >= 50 ? "trend--positive" : occupancy === 0 ? "" : "trend--negative");
   }
 
   renderCharts(finances, bookings, supplies, customers);
@@ -339,8 +385,10 @@ function renderCharts(finances, bookings, supplies, customers) {
     },
   });
 
-  /* Chart 4: Bookings by Status (doughnut) — replaces Property Performance,
-     which was meaningless with a single property. */
+  /* Chart 4: Occupancy Rate Over Time (bar, grouped by week) */
+  charts.occupancy = renderOccupancyChart(ctx("chartOccupancy"), bookings, C);
+
+  /* Chart 5: Bookings by Status (doughnut) */
   const byStatus = bookings.reduce((acc, b) => {
     const key = b.status || "unknown";
     acc[key] = (acc[key] || 0) + 1;
@@ -389,11 +437,85 @@ function renderCharts(finances, bookings, supplies, customers) {
   });
 }
 
+function getWeekStart(d) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = (day === 0 ? -6 : 1 - day); // Monday is start of week
+  date.setDate(date.getDate() + diff);
+  return date;
+}
+
+function renderOccupancyChart(canvasEl, bookings, C) {
+  if (!canvasEl) return null;
+  // Group bookings by week (Mon–Sun) and compute occupancy per week
+  const weeks = {};
+  bookings.forEach((b) => {
+    if (b.status === "cancelled" || !b.checkIn || !b.checkOut) return;
+    const cin = new Date(b.checkIn);
+    const weekStart = getWeekStart(cin);
+    const weekKey = utils.formatDateISO(weekStart);
+    if (!weeks[weekKey]) weeks[weekKey] = { bookedNights: 0, totalDays: 7 };
+    const cout = new Date(b.checkOut);
+    const nights = Math.ceil((cout - cin) / (1000 * 60 * 60 * 24));
+    weeks[weekKey].bookedNights += nights;
+  });
+  const weekKeys = Object.keys(weeks).sort();
+  const data = weekKeys.map((k) => Math.round((weeks[k].bookedNights / weeks[k].totalDays) * 100));
+  return new Chart(canvasEl, {
+    type: "bar",
+    data: {
+      labels: weekKeys.length ? weekKeys : ["No data"],
+      datasets: [{
+        label: "Occupancy %",
+        data: data.length ? data : [0],
+        backgroundColor: "rgba(59,130,246,.7)",
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      color: C.text,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: C.surface,
+          titleColor: C.text,
+          bodyColor: C.textDim,
+          borderColor: C.border,
+          borderWidth: 1,
+          callbacks: {
+            label: (ctx) => `${ctx.parsed.y}%`,
+          },
+        },
+      },
+      scales: {
+        y: {
+          ticks: { color: C.textDim },
+          grid: { color: C.grid },
+          beginAtZero: true,
+          max: 100,
+          title: { display: true, text: "Occupancy %", color: C.textDim, font: { size: 11 } },
+        },
+        x: {
+          ticks: { color: C.textDim },
+          grid: { display: false },
+        },
+      },
+    },
+  });
+}
+
 window.appClearDashboardDates = function () {
+  datePreset = "";
   dashboardDateFrom = "";
   dashboardDateTo = "";
+  const presetEl = document.getElementById("dashboardDatePreset");
+  const customEl = document.getElementById("dashboardDateCustom");
   const df = document.getElementById("dashboardDateFrom");
   const dt = document.getElementById("dashboardDateTo");
+  if (presetEl) presetEl.value = "";
+  if (customEl) customEl.classList.remove("date-custom--visible");
   if (df) df.value = "";
   if (dt) dt.value = "";
   applyDashboardFilters();
