@@ -2,11 +2,11 @@
    Endpoints: getBookings, addBooking, updateBooking, deleteBooking, getCustomers.
    Model: {id, customerId, checkIn, checkOut, nights, total, status}
 */
-import { api } from "./auth.js?v=40";
-import { utils } from "./utils.js?v=40";
-import { refreshDashboard } from "./dashboard.js?v=40";
-import { CONFIG } from "./config.js?v=40";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=40";
+import { api } from "./auth.js?v=41";
+import { utils } from "./utils.js?v=41";
+import { refreshDashboard } from "./dashboard.js?v=41";
+import { CONFIG } from "./config.js?v=41";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=41";
 
 
 

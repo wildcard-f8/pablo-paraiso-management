@@ -3,9 +3,9 @@
            expenses by category (doughnut), bookings by status (doughnut),
            occupancy rate over time (bar).
 */
-import { api } from "./auth.js?v=40";
-import { utils } from "./utils.js?v=40";
-import { CONFIG } from "./config.js?v=40";
+import { api } from "./auth.js?v=41";
+import { utils } from "./utils.js?v=41";
+import { CONFIG } from "./config.js?v=41";
 
 let charts = {};
 let dashboardRoot = null;
@@ -237,10 +237,10 @@ function renderDashboard(finances, bookings, supplies) {
     trendOcc.className = "card__trend " + (occupancy >= 50 ? "trend--positive" : occupancy === 0 ? "" : "trend--negative");
   }
 
-  renderCharts(finances, bookings, supplies, customers);
+  renderCharts(finances, bookings, supplies);
 }
 
-function renderCharts(finances, bookings, supplies, customers) {
+function renderCharts(finances, bookings, supplies) {
   // Safety net: destroy any existing charts before creating new ones
   // (prevents "Canvas already in use" when the same canvas is reused)
   Object.values(charts).forEach((c) => { if (c) c.destroy(); });
