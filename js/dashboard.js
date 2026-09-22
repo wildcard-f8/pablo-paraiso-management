@@ -3,9 +3,9 @@
            expenses by category (doughnut), bookings by status (doughnut),
            occupancy rate over time (bar).
 */
-import { api } from "./auth.js?v=26";
-import { utils } from "./utils.js?v=26";
-import { CONFIG } from "./config.js?v=26";
+import { api } from "./auth.js?v=27";
+import { utils } from "./utils.js?v=27";
+import { CONFIG } from "./config.js?v=27";
 
 let charts = {};
 let dashboardRoot = null;
@@ -145,7 +145,14 @@ export function createDashboard(_args, ref) {
 
 async function loadDashboard() {
   const myGeneration = loadGeneration;
-  appRef.showPageLoader("Loading dashboard…");
+  /* Only show the page loader if we need to fetch from the backend.
+     If all data is in the cache (sessionStorage), the Promise.all
+     below resolves in milliseconds — no need for a spinner flash. */
+  const allCached = api.isCached("getFinances") &&
+    api.isCached("getBookings") &&
+    api.isCached("getCustomers") &&
+    api.isCached("getSupplies");
+  if (!allCached) appRef.showPageLoader("Loading dashboard…");
   try {
     const [finances, bookings, customers, supplies] = await Promise.all([
       api.get("getFinances"),

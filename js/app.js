@@ -1,17 +1,17 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=26";
-import { api, auth } from "./auth.js?v=26";
-import { utils, $, $$ } from "./utils.js?v=26";
-import { createDashboard } from "./dashboard.js?v=26";
-import { createFinances } from "./finances.js?v=26";
-import { createCustomers } from "./customers.js?v=26";
-import { createBookings } from "./bookings.js?v=26";
-import { createCalendar } from "./calendar.js?v=26";
-import { createSupplies } from "./supplies.js?v=26";
-import { createWebsite } from "./website.js?v=26";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=26";
+import { CONFIG } from "./config.js?v=27";
+import { api, auth } from "./auth.js?v=27";
+import { utils, $, $$ } from "./utils.js?v=27";
+import { createDashboard } from "./dashboard.js?v=27";
+import { createFinances } from "./finances.js?v=27";
+import { createCustomers } from "./customers.js?v=27";
+import { createBookings } from "./bookings.js?v=27";
+import { createCalendar } from "./calendar.js?v=27";
+import { createSupplies } from "./supplies.js?v=27";
+import { createWebsite } from "./website.js?v=27";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=27";
 
 
 let currentParams = {};
@@ -830,7 +830,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=26";
+export { utils, $, $$ } from "./utils.js?v=27";
 
 /* Export app and default */
 export { app };

@@ -9,7 +9,7 @@
    Usage: auth.init() boots GIS; auth.isAuthed() returns bool;
           auth.api(action, body) => Promise<data>.
 */
-import { CONFIG } from "./config.js?v=26";
+import { CONFIG } from "./config.js?v=27";
 
 const TOKEN_KEY = "paraiso_gis_token";
 
@@ -252,10 +252,14 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
 /* ─── Response cache ───
    GET responses are cached for 5 min so navigating between pages
    doesn't hit the GAS backend (cold-start ~1-2s) repeatedly.
-   POST/DELETE automatically invalidates the cache.
-   5 min strikes a balance between freshness and avoiding cold starts. */
+   The cache lives in BOTH an in-memory Map (fast access) and
+   sessionStorage (survives page reloads). When the page is refreshed,
+   fresh cached responses are served from sessionStorage immediately,
+   avoiding GAS cold-start latency.
+   POST/DELETE automatically invalidates the cache. */
 const CACHE_TTL_MS = 300_000;
 const cache = new Map(); // key → { data, timestamp }
+const CACHE_PREFIX = "paraiso_api_";
 
 function cacheKey(action, query) {
   if (!query) return action;
@@ -267,17 +271,35 @@ function cacheKey(action, query) {
 }
 
 function cacheGet(key) {
+  /* Check in-memory Map first (fast path) */
   const hit = cache.get(key);
-  if (!hit) return null;
-  if (Date.now() - hit.timestamp > CACHE_TTL_MS) {
+  if (hit) {
+    if (Date.now() - hit.timestamp <= CACHE_TTL_MS) return hit.data;
     cache.delete(key);
     return null;
   }
-  return hit.data;
+  /* Fall back to sessionStorage — survives page reloads */
+  try {
+    const stored = sessionStorage.getItem(CACHE_PREFIX + key);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Date.now() - parsed.timestamp <= CACHE_TTL_MS) {
+        cache.set(key, parsed);
+        return parsed.data;
+      }
+      sessionStorage.removeItem(CACHE_PREFIX + key);
+    }
+  } catch { /* ignore JSON parse errors */ }
+  return null;
 }
 
 function cacheSet(key, data) {
-  cache.set(key, { data, timestamp: Date.now() });
+  const entry = { data, timestamp: Date.now() };
+  cache.set(key, entry);
+  /* Persist to sessionStorage so the cache survives page reloads */
+  try {
+    sessionStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));
+  } catch { /* ignore storage quota errors */ }
 }
 
 function invalidateCache(pattern) {
@@ -285,9 +307,23 @@ function invalidateCache(pattern) {
   for (const key of cache.keys()) {
     if (key === pattern || key.startsWith(pattern)) cache.delete(key);
   }
+  /* Also clear matching sessionStorage entries */
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const k = sessionStorage.key(i);
+      if (k && k.startsWith(CACHE_PREFIX + pattern)) {
+        sessionStorage.removeItem(k);
+      }
+    }
+  } catch { /* ignore */ }
 }
 
 export const api = {
+  isCached(action, query) {
+    const key = cacheKey(action, query);
+    /* Check in-memory first; if not there, try sessionStorage */
+    return cacheGet(key) !== null;
+  },
   async get(action, query) {
     const key = cacheKey(action, query);
     const cached = cacheGet(key);

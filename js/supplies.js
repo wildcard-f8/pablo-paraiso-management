@@ -2,10 +2,10 @@
    Endpoints: getSupplies, addSupply, updateSupply, deleteSupply.
    Model: {id, name, category, quantity, unit, unitCost, lastOrdered, supplier, minStock}
 */
-import { api } from "./auth.js?v=26";
-import { utils } from "./utils.js?v=26";
-import { CONFIG } from "./config.js?v=26";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=26";
+import { api } from "./auth.js?v=27";
+import { utils } from "./utils.js?v=27";
+import { CONFIG } from "./config.js?v=27";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=27";
 
 let container = null;
 let data = [];
