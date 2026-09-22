@@ -21,7 +21,7 @@
 var HEADERS = {
   Finances:    ['id', 'date', 'type', 'category', 'description', 'amount', 'bookingId', 'lastModified'],
   Customers:   ['id', 'name', 'email', 'phone', 'address', 'notes', 'lastModified'],
-  Bookings:    ['id', 'customerId', 'property', 'checkIn', 'checkOut', 'nights', 'total', 'status', 'createdAt', 'eventType', 'guests', 'budget', 'specialRequests', 'lastModified'],
+  Bookings:    ['id', 'customerId', 'checkIn', 'checkOut', 'nights', 'total', 'status', 'createdAt', 'eventType', 'guests', 'budget', 'specialRequests', 'lastModified'],
   Supplies:    ['id', 'name', 'category', 'quantity', 'unit', 'unitCost', 'lastOrdered', 'supplier', 'minStock', 'lastModified'],
                             // Properties tab removed — single venue: "Pablo Paraiso Pool House" (hardcoded in Bookings)
   Config:      ['key', 'value'],
@@ -843,6 +843,7 @@ function requireAuth(e) {
   }
 
   if (!token) {
+    logActivity({ action: "auth_required", status: "failed", details: "No token provided", data: { actionParam: (e && e.parameter) ? e.parameter.action : null } });
     return { valid: false, email: null, status: 401, error: 'Authentication required. Please sign in.' };
   }
 
@@ -895,6 +896,7 @@ function requireAuth(e) {
       }
     }
     if (!info) {
+      logActivity({ action: "token_verification", status: "failed", details: "No verification info returned from Google", data: { tokenLength: token.length, actionParam: (e && e.parameter) ? e.parameter.action : null } });
       return { valid: false, email: null, status: 401, error: 'Invalid token. Please sign in again.' };
     }
     if (info.error || !info.email) {
@@ -902,6 +904,7 @@ function requireAuth(e) {
     }
 
     if (!isUserAuthorized(info.email)) {
+      logActivity({ action: "authz_denied", status: "failed", details: info.email + " is not authorized", data: { email: info.email, actionParam: (e && e.parameter) ? e.parameter.action : null } });
       return {
         valid: false,
         email: info.email,
@@ -913,6 +916,7 @@ function requireAuth(e) {
     /* Cache the verified token for 59 minutes (1 hour = GIS token lifetime) */
     try {
       _cache.put(token, JSON.stringify({ valid: true, email: info.email }), 59 * 60);
+      logActivity({ action: "login", status: "success", details: "Token verified and cached", data: { email: info.email } });
     } catch (_cacheWriteErr) {
       console.log('requireAuth: cache write failed: ' + _cacheWriteErr.message);
     }
@@ -1022,12 +1026,20 @@ function doPost(e) {
       return sendError('Missing "action" parameter');
     }
 
-    /* ─── Public endpoint: website booking submissions ───
-       No auth required — the public website posts here directly.
-       The data is validated and written to both the Bookings and
-       WebBookings sheets, plus a calendar event is created. */
-    if (action === 'submitPublicBooking') {
-      return submitPublicBooking(e);
+    /* Public endpoints (no auth required) */
+    if (action === 'submitPublicBooking') { return submitPublicBooking(e); }
+
+    /* logActivity — public endpoint for logging auth events and errors.
+     * Accepts { action, status, details?, data? } and writes to ActivityLog sheet.
+     * This is public so that login attempts (including failures) can be logged
+     * before the user has a valid token. */
+    if (action === 'logActivity') {
+      var logData = null;
+      if (e.postData && e.postData.contents) {
+        try { logData = JSON.parse(e.postData.contents); } catch (jsonErr) { return sendError('Invalid JSON body'); }
+      }
+      if (!logData) { return sendError('Request body is required'); }
+      return sendSuccess(logActivity(logData));
     }
 
     /* Require valid GIS token + allow-list check for all other actions */
@@ -1183,7 +1195,6 @@ function submitPublicBooking(e) {
     var price = PACKAGE_PRICES[data.package] || 0;
     var bookingData = {
       customerId: customer.id,
-      property: "Pablo Paraiso Pool House",
       checkIn: formatDate(startDateTime),
       checkOut: formatDate(endDateTime),
       nights: 0,
@@ -1436,6 +1447,37 @@ function writeWebBookingRow(data, bookingId, eventId, timestamp, clientIP) {
 
 /**
  * Logs an activity entry to the ActivityLog sheet.
+ * Used by the logActivity endpoint to record auth events, errors, etc.
+ * @param {Object} data - { action, status, details?, data?, clientIP? }
+ * @return {Object} { success: true } or { success: false, error: "..." }
+ */
+function logActivity(data) {
+  try {
+    if (!data || !data.action) { return { success: false, error: "action is required" }; }
+    var spreadsheet = getSpreadsheet();
+    var logSheet = spreadsheet.getSheetByName("ActivityLog");
+    if (!logSheet) {
+      logSheet = spreadsheet.insertSheet("ActivityLog");
+      logSheet.appendRow(LOG_COLUMNS);
+      logSheet.setFrozenRows(1);
+    }
+    logSheet.appendRow([
+      new Date(),
+      data.action || "",
+      data.status || "",
+      data.data ? JSON.stringify(data.data) : "",
+      data.details || "",
+      data.clientIP || ""
+    ]);
+    return { success: true };
+  } catch (err) {
+    console.log("logActivity failed: " + err.toString());
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Logs an activity entry to the ActivityLog sheet.
  * @param {string} action
  * @param {string} status
  * @param {Object} data
@@ -1470,7 +1512,40 @@ function logPublicActivity(action, status, data, details, clientIP) {
  * ========================================================================== */
 
 function getFinances()    { return sheetToRecords(getSheet('Finances')); }
-function getCustomers()   { return sheetToRecords(getSheet('Customers')); }
+function getCustomers() {
+  var customers = sheetToRecords(getSheet('Customers'));
+  var bookings = sheetToRecords(getSheet('Bookings'));
+
+  /* Compute first/last booking date and count per customer */
+  var byCustomer = {};
+  for (var i = 0; i < bookings.length; i++) {
+    var b = bookings[i];
+    var cid = b.customerId;
+    if (!byCustomer[cid]) byCustomer[cid] = [];
+    byCustomer[cid].push(b);
+  }
+
+  for (var c = 0; c < customers.length; c++) {
+    var cid = customers[c].id;
+    var bks = byCustomer[cid];
+    if (bks && bks.length > 0) {
+      bks.sort(function (a, b) {
+        var da = new Date(a.checkIn || a.createdAt || '');
+        var db = new Date(b.checkIn || b.createdAt || '');
+        return da - db;
+      });
+      customers[c].firstBookingDate = bks[0].checkIn || bks[0].createdAt || '';
+      customers[c].lastBookingDate = bks[bks.length - 1].checkIn || bks[bks.length - 1].createdAt || '';
+      customers[c].bookingCount = bks.length;
+    } else {
+      customers[c].firstBookingDate = '';
+      customers[c].lastBookingDate = '';
+      customers[c].bookingCount = 0;
+    }
+  }
+
+  return customers;
+}
 function getBookings()    { return sheetToRecords(getSheet('Bookings')); }
 function getSupplies()    { return sheetToRecords(getSheet('Supplies')); }
   /* getProperties() — REMOVED: single venue (Pablo Paraiso Pool House).
@@ -1781,11 +1856,11 @@ function seedDatabase() {
     spreadsheet.insertSheet('Bookings');
   bookingsSheet.clear();
   bookingsSheet.appendRow(HEADERS.Bookings);
-  bookingsSheet.appendRow(['B0001', 'C0001', 'Pablo Paraiso Pool House', '2024-01-20', '2024-01-25', 5, 15000, 'confirmed', '2024-01-01', 'Pool Party', 20, '', '', now]);
-  bookingsSheet.appendRow(['B0002', 'C0002', 'Pablo Paraiso Pool House', '2024-02-10', '2024-02-14', 4, 10000, 'confirmed', '2024-01-15', 'Birthday Celebration', 15, '', '', now]);
-  bookingsSheet.appendRow(['B0003', 'C0003', 'Pablo Paraiso Pool House', '2024-02-20', '2024-02-27', 7, 28000, 'confirmed', '2024-02-01', 'Family Gathering', 30, '', '', now]);
-  bookingsSheet.appendRow(['B0004', 'C0004', 'Pablo Paraiso Pool House', '2024-03-05', '2024-03-08', 3, 7500, 'pending', '2024-02-20', 'Team Building', 12, '', '', now]);
-  bookingsSheet.appendRow(['B0005', 'C0005', 'Pablo Paraiso Pool House', '2024-03-15', '2024-03-22', 7, 35000, 'confirmed', '2024-03-01', 'Pool Party', 25, '', '', now]);
+  bookingsSheet.appendRow(['B0001', 'C0001', '2024-01-20', '2024-01-25', 5, 15000, 'confirmed', '2024-01-01', 'Pool Party', 20, '', '', now]);
+  bookingsSheet.appendRow(['B0002', 'C0002', '2024-02-10', '2024-02-14', 4, 10000, 'confirmed', '2024-01-15', 'Birthday Celebration', 15, '', '', now]);
+  bookingsSheet.appendRow(['B0003', 'C0003', '2024-02-20', '2024-02-27', 7, 28000, 'confirmed', '2024-02-01', 'Family Gathering', 30, '', '', now]);
+  bookingsSheet.appendRow(['B0004', 'C0004', '2024-03-05', '2024-03-08', 3, 7500, 'pending', '2024-02-20', 'Team Building', 12, '', '', now]);
+  bookingsSheet.appendRow(['B0005', 'C0005', '2024-03-15', '2024-03-22', 7, 35000, 'confirmed', '2024-03-01', 'Pool Party', 25, '', '', now]);
 
   // --- Supplies ---
   var suppliesSheet = spreadsheet.getSheetByName('Supplies') ||

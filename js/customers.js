@@ -1,11 +1,12 @@
 /* customers.js - Table CRUD for Customer records.
    Endpoints: getCustomers, addCustomer, updateCustomer, deleteCustomer.
    Model: {id,name,email,phone,address,notes}
-   Note: firstRequest/lastRequest are computed from the Bookings sheet.
+   Note: firstBookingDate, lastBookingDate, and bookingCount are computed
+   from the Bookings sheet (in the backend getCustomers() response).
 */
-import { api } from "./auth.js?v=35";
-import { utils } from "./utils.js?v=35";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=35";
+import { api } from "./auth.js?v=37";
+import { utils } from "./utils.js?v=37";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=37";
 
 let container = null;
 let data = [];
@@ -22,8 +23,9 @@ const COLUMNS = [
   { key: "name", label: "Name", type: "string" },
   { key: "email", label: "Email", type: "string" },
   { key: "phone", label: "Phone", type: "string" },
-  { key: "firstRequest", label: "First Request", type: "date" },
-  { key: "lastRequest", label: "Last Request", type: "date" },
+  { key: "firstBookingDate", label: "First Booking", type: "date" },
+  { key: "lastBookingDate", label: "Last Booking", type: "date" },
+  { key: "bookingCount", label: "Bookings", type: "number" },
   { key: "address", label: "Address", type: "string" },
 ];
 
@@ -45,9 +47,9 @@ export function createCustomers(_args, ref) {
             <option value="custom">Custom range…</option>
           </select>
           <div class="date-custom" id="customerDateCustom">
-            <label for="customerDateFrom">First Request From</label>
+            <label for="customerDateFrom">First Booking From</label>
             <input type="date" id="customerDateFrom" />
-            <label for="customerDateTo">First Request To</label>
+            <label for="customerDateTo">First Booking To</label>
             <input type="date" id="customerDateTo" />
             <button class="btn btn--ghost btn--sm" onclick="appClearCustomerDates()">Clear</button>
           </div>
@@ -110,11 +112,15 @@ export function createCustomers(_args, ref) {
 }
 
 async function loadCustomers() {
-  const [cust, bk] = await Promise.all([
-    api.get("getCustomers"),
-    api.get("getBookings"),
-  ]);
-  bookings = bk;
+  const cust = await api.get("getCustomers");
+
+  /* If backend provides first/last booking dates (v37+), use them directly.
+     Otherwise, fall back to computing from the Bookings sheet. */
+  if (cust.length > 0 && cust[0].firstBookingDate !== undefined) {
+    data = cust;
+  } else {
+    const bk = await api.get("getBookings");
+    bookings = bk || [];
 
   /* Deduplicate customers by email (case-insensitive), falling back to
      normalised name, then raw id. A returning customer may have multiple
@@ -148,7 +154,7 @@ async function loadCustomers() {
     idGroupMap.get(pid).push(cid);
   });
 
-  data = Array.from(groups.values()).map((c) => {
+    data = Array.from(groups.values()).map((c) => {
     const allIds = idGroupMap.get(c.id) || [c.id];
     const custBookings = bookings
       .filter((b) => allIds.includes(b.customerId) && (b.createdAt || b.checkIn))
@@ -157,10 +163,12 @@ async function loadCustomers() {
     custBookings.sort((a, b) => a - b);
     return {
       ...c,
-      firstRequest: custBookings.length ? custBookings[0].toISOString().split("T")[0] : "",
-      lastRequest: custBookings.length ? custBookings[custBookings.length - 1].toISOString().split("T")[0] : "",
+      firstBookingDate: custBookings.length ? custBookings[0].toISOString().split("T")[0] : "",
+      lastBookingDate: custBookings.length ? custBookings[custBookings.length - 1].toISOString().split("T")[0] : "",
+      bookingCount: custBookings.length,
     };
   });
+  }
   renderTable();
 }
 
@@ -174,10 +182,10 @@ function renderTable() {
     (c.email || "").toLowerCase().includes(term) ||
     (c.phone || "").toLowerCase().includes(term)
   );
-  // Date range filter on firstRequest
+  // Date range filter on firstBookingDate
   const { from, to } = utils.computeDateRange(datePreset, dateFrom, dateTo);
   if (from || to) {
-    filtered = utils.filterByDateRange(filtered, "firstRequest", from || null, to || null);
+    filtered = utils.filterByDateRange(filtered, "firstBookingDate", from || null, to || null);
   }
   const sorted = applySort(filtered, cols, sortState);
 
@@ -192,8 +200,9 @@ function renderTable() {
     Name: utils.escapeHTML(c.name || ""),
     Email: utils.escapeHTML(c.email || ""),
     Phone: utils.escapeHTML(c.phone || ""),
-    "First Request": c.firstRequest ? utils.formatDate(c.firstRequest) : "—",
-    "Last Request": c.lastRequest ? utils.formatDate(c.lastRequest) : "—",
+    "First Booking": c.firstBookingDate ? utils.formatDate(c.firstBookingDate) : "—",
+    "Last Booking": c.lastBookingDate ? utils.formatDate(c.lastBookingDate) : "—",
+    Bookings: c.bookingCount != null ? c.bookingCount : "—",
     Address: utils.escapeHTML(c.address || ""),
   }));
 

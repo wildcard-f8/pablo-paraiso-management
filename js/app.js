@@ -1,17 +1,17 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=35";
-import { api, auth } from "./auth.js?v=35";
-import { utils, $, $$ } from "./utils.js?v=35";
-import { createDashboard } from "./dashboard.js?v=35";
-import { createFinances } from "./finances.js?v=35";
-import { createCustomers } from "./customers.js?v=35";
-import { createBookings } from "./bookings.js?v=35";
-import { createCalendar } from "./calendar.js?v=35";
-import { createSupplies } from "./supplies.js?v=35";
-import { createWebsite } from "./website.js?v=35";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=35";
+import { CONFIG } from "./config.js?v=37";
+import { api, auth } from "./auth.js?v=37";
+import { utils, $, $$ } from "./utils.js?v=37";
+import { createDashboard } from "./dashboard.js?v=37";
+import { createFinances } from "./finances.js?v=37";
+import { createCustomers } from "./customers.js?v=37";
+import { createBookings } from "./bookings.js?v=37";
+import { createCalendar } from "./calendar.js?v=37";
+import { createSupplies } from "./supplies.js?v=37";
+import { createWebsite } from "./website.js?v=37";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=37";
 
 
 let currentParams = {};
@@ -782,19 +782,19 @@ const app = {
 
     // Bookings
     await api.post("addBooking", {
-      customerId: "C0002", property: "Pablo Paraiso Pool House", checkIn: "2024-02-10",
+      customerId: "C0002", checkIn: "2024-02-10",
       checkOut: "2024-02-14", nights: 4, total: 10000, status: "confirmed", createdAt: "2024-01-15",
     });
     await api.post("addBooking", {
-      customerId: "C0003", property: "Pablo Paraiso Pool House", checkIn: "2024-02-20",
+      customerId: "C0003", checkIn: "2024-02-20",
       checkOut: "2024-02-27", nights: 7, total: 28000, status: "confirmed", createdAt: "2024-02-01",
     });
     await api.post("addBooking", {
-      customerId: "C0004", property: "Pablo Paraiso Pool House", checkIn: "2024-03-05",
+      customerId: "C0004", checkIn: "2024-03-05",
       checkOut: "2024-03-08", nights: 3, total: 7500, status: "pending", createdAt: "2024-02-20",
     });
     await api.post("addBooking", {
-      customerId: "C0005", property: "Pablo Paraiso Pool House", checkIn: "2024-03-15",
+      customerId: "C0005", checkIn: "2024-03-15",
       checkOut: "2024-03-22", nights: 7, total: 35000, status: "confirmed", createdAt: "2024-03-01",
     });
 
@@ -840,7 +840,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=35";
+export { utils, $, $$ } from "./utils.js?v=37";
 
 /* Export app and default */
 export { app };

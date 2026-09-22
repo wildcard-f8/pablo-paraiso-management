@@ -9,7 +9,7 @@
    Usage: auth.init() boots GIS; auth.isAuthed() returns bool;
           auth.api(action, body) => Promise<data>.
 */
-import { CONFIG } from "./config.js?v=35";
+import { CONFIG } from "./config.js?v=37";
 
 const TOKEN_KEY = "paraiso_gis_token";
 
@@ -45,9 +45,15 @@ function initGis() {
       console.log('Stored token type:', idToken && idToken.split('.').length === 3 ? 'JWT (id_token)' : idToken ? 'opaque (access_token)' : 'null');
       persistToken(idToken);
       document.dispatchEvent(new CustomEvent("auth:changed", { detail: { authed: !!idToken } }));
+      if (idToken) {
+        logActivity("login", "success", "GIS sign-in completed", { hasIdToken: !!response?.id_token, hasAccess: !!response?.access_token });
+      } else {
+        logActivity("login", "failed", "GIS returned no token", { responseKeys: Object.keys(response || {}) });
+      }
     },
     error_callback: (e) => {
       console.error("GIS error:", e);
+      logActivity("login", "failed", "GIS error", { error: String(e) });
       document.dispatchEvent(new CustomEvent("auth:changed", { detail: { authed: false, error: e } }));
     },
   });
@@ -137,12 +143,14 @@ export const auth = {
   },
 
   signOut() {
+    const wasAuthed = !!idToken;
     idToken = null;
     persistToken(null);
     if (window.google?.accounts?.id) {
       google.accounts.id.disableAutoSelect?.();
     }
     document.dispatchEvent(new CustomEvent("auth:changed", { detail: { authed: false } }));
+    if (wasAuthed) logActivity("logout", "success", "User signed out");
   },
 
   /**
@@ -316,6 +324,7 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
     /* Retry on network error (excluding auth errors which come as JSON 401) */
     if (!resp && method === "GET" && _attempt < RETRY_LIMIT) {
       if (_attempt === 0) {
+        logActivity("network_error", "failed", networkErr.message, { action, method, attempt: _attempt + 1 });
         console.warn('fetchGAS: warming up backend for ' + action + ' (attempt ' + (_attempt + 2) + '/' + (RETRY_LIMIT + 1) + ')');
       }
       await new Promise((r) => setTimeout(r, RETRY_DELAYS[_attempt]));
@@ -338,6 +347,7 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
        with progressive delays to let the GAS instance warm up. */
     if (method === "GET" && _attempt < RETRY_LIMIT) {
       if (_attempt === 0) {
+        logActivity("backend_error", "failed", `Non-JSON response (${resp.status})`, { action, method, attempt: _attempt + 1, textSnippet: text.slice(0, 80) });
         console.warn(`fetchGAS: retrying ${action} after non-JSON (${resp.status}) —`, text.slice(0, 80));
       }
       await new Promise((r) => setTimeout(r, RETRY_DELAYS[_attempt]));
@@ -354,12 +364,14 @@ export async function fetchGAS(action, { method = "GET", body = null, query = nu
     const statusCode = payload.status || resp.status;
     const errMsg = payload.error || "";
     const isAuthErr = statusCode === 401 || errMsg.includes("Authentication required") || errMsg.includes("Invalid token");
-    /* 401 → backend not authenticated: tell the app to prompt sign-in */
+      /* 401 → backend not authenticated: tell the app to prompt sign-in */
     if (isAuthErr) {
+      logActivity("auth_required", "failed", errMsg, { action, statusCode });
       document.dispatchEvent(new CustomEvent("auth:required", { detail: { message: errMsg } }));
     }
     /* 403 → signed in but not on allow-list */
     if (statusCode === 403 || errMsg.includes("not authorized") || errMsg.includes("Access denied")) {
+      logActivity("auth_denied", "failed", errMsg, { action, statusCode });
       document.dispatchEvent(new CustomEvent("auth:denied", { detail: { message: errMsg } }));
     }
     const err = new Error(errMsg || `Request failed (action=${action})`);
@@ -473,5 +485,21 @@ export const api = {
     return api.post(action, data);
   },
 };
+
+/**
+ * logActivity(action, status, details, data)
+ * Sends an activity log entry to the backend's public logActivity endpoint.
+ * Fire-and-forget: any errors are swallowed so logging never breaks the
+ * user flow. Used for sign-in successes/failures, network errors, etc.
+ */
+function logActivity(action, status, details, data) {
+  try {
+    const payload = { action, status };
+    if (details) payload.details = String(details).slice(0, 500);
+    if (data) payload.data = data;
+    /* Send via fetchGAS — if it fails, silently ignore */
+    fetchGAS("logActivity", { method: "POST", body: payload }).catch(() => {});
+  } catch { /* swallow — logging is best-effort */ }
+}
 
 export default auth;

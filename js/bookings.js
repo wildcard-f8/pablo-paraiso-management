@@ -1,15 +1,14 @@
 /* bookings.js - Table CRUD for Booking records + calendar link.
    Endpoints: getBookings, addBooking, updateBooking, deleteBooking, getCustomers.
-   Model: {id, customerId, property, checkIn, checkOut, nights, total, status}
-   Single property: "Pablo Paraiso Pool House" (hardcoded — no Properties sheet).
+   Model: {id, customerId, checkIn, checkOut, nights, total, status}
 */
-import { api } from "./auth.js?v=35";
-import { utils } from "./utils.js?v=35";
-import { refreshDashboard } from "./dashboard.js?v=35";
-import { CONFIG } from "./config.js?v=35";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=35";
+import { api } from "./auth.js?v=37";
+import { utils } from "./utils.js?v=37";
+import { refreshDashboard } from "./dashboard.js?v=37";
+import { CONFIG } from "./config.js?v=37";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=37";
 
-const PROPERTY_NAME = "Pablo Paraiso Pool House";
+
 
 const COLUMNS = [
   { key: "customer", label: "Customer", type: "string" },
@@ -150,7 +149,6 @@ function renderTable() {
     .filter((b) => {
       const matches =
         (customerName(b.customerId) || "").toLowerCase().includes(term) ||
-        (b.property || "").toLowerCase().includes(term) ||
         String(b.status || "").toLowerCase().includes(term);
       const statusOk = statusFilter === "all" || (b.status || "") === statusFilter;
       return matches && statusOk;
@@ -224,9 +222,7 @@ function renderTable() {
   container.appendChild(t);
 }
 
-/* Customer option list for the select dropdown.
-   Property is a single hardcoded value (Pablo Paraiso Pool House),
-   so no dropdown is needed — it is set as a hidden field on submit. */
+/* Customer option list for the select dropdown. */
 function customerOptions() {
   return Object.entries(customers).map(([id, c]) => ({ value: id, label: c.name || id }));
 }
@@ -239,7 +235,6 @@ window.appAddBooking = async function () {
     size: "fullscreen",
     fields: [
       { name: "customerId", label: "Customer", type: "select", options: customerOptions(), default: "", required: true },
-      { name: "property", type: "hidden", default: PROPERTY_NAME },
       { name: "checkIn", label: "Check-in", type: "date", default: utils.formatDateISO(new Date()), required: true },
       { name: "checkOut", label: "Check-out", type: "date", default: "", required: true },
       { name: "nights", label: "Nights", type: "number", default: "", hint: "Auto-calculated if blank." },
@@ -276,7 +271,6 @@ window.appEditBooking = async function (id) {
     size: "fullscreen",
     fields: [
       { name: "customerId", label: "Customer", type: "select", options: customerOptions(), default: b.customerId || "", required: true },
-      { name: "property", type: "hidden", default: b.property || PROPERTY_NAME },
       { name: "checkIn", label: "Check-in", type: "date", default: b.checkIn || "", required: true },
       { name: "checkOut", label: "Check-out", type: "date", default: b.checkOut || "", required: true },
       { name: "nights", label: "Nights", type: "number", default: b.nights || "" },

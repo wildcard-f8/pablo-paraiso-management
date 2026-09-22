@@ -2,8 +2,8 @@
    Supports adding/editing/deleting calendar events, and clicking an event
    navigates to the bookings page for that booking.
 */
-import { api } from "./auth.js?v=35";
-import { utils } from "./utils.js?v=35";
+import { api } from "./auth.js?v=37";
+import { utils } from "./utils.js?v=37";
 
 let calendarRef = null;
 let calendarEl = null;
@@ -104,7 +104,7 @@ function enrichEvent(evt) {
     const b = bookings.find((bk) => bk.id === evt.bookingId);
     if (b) {
       const custName = customers[b.customerId]?.name || b.customerId || "guest";
-      title = `Booking: ${custName} — ${b.property || ""}`;
+      title = `Booking: ${custName}`;
     } else {
       title = `Booking ${evt.bookingId}`;
     }
