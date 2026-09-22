@@ -846,6 +846,25 @@ function requireAuth(e) {
     return { valid: false, email: null, status: 401, error: 'Authentication required. Please sign in.' };
   }
 
+  /* === Token verification caching ===
+   * CacheService caches verified tokens for 59 minutes (just under the
+   * 1-hour GIS token lifetime). Prevents repeated UrlFetchApp.fetch calls
+   * to Google's tokeninfo/userinfo endpoints on every API request, which
+   * can fail under parallel load (dashboard makes 3-4 calls at once). */
+  var _cache = CacheService.getScriptCache();
+  var _cachedResult = _cache.get(token);
+  if (_cachedResult) {
+    try {
+      var _cached = JSON.parse(_cachedResult);
+      if (_cached.valid && _cached.email && isUserAuthorized(_cached.email)) {
+        console.log('requireAuth: cache hit for action=' + (e.parameter && e.parameter.action));
+        return { valid: true, email: _cached.email, status: 200, error: null };
+      }
+    } catch (_cacheErr) {
+      console.log('requireAuth: cache parse error: ' + _cacheErr.message);
+    }
+  }
+
   try {
     var info = null;
     var tokenIsJwt = token.split('.').length === 3;
@@ -889,6 +908,13 @@ function requireAuth(e) {
         status: 403,
         error: info.email + ' is not authorized to access this application. Contact the owner to be added to the allow-list.'
       };
+    }
+
+    /* Cache the verified token for 59 minutes (1 hour = GIS token lifetime) */
+    try {
+      _cache.put(token, JSON.stringify({ valid: true, email: info.email }), 59 * 60);
+    } catch (_cacheWriteErr) {
+      console.log('requireAuth: cache write failed: ' + _cacheWriteErr.message);
     }
 
     return { valid: true, email: info.email, status: 200, error: null };
