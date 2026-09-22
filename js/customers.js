@@ -3,9 +3,9 @@
    Model: {id,name,email,phone,address,notes}
    Note: firstRequest/lastRequest are computed from the Bookings sheet.
 */
-import { api } from "./auth.js?v=23";
-import { utils } from "./utils.js?v=23";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=23";
+import { api } from "./auth.js?v=24";
+import { utils } from "./utils.js?v=24";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=24";
 
 let container = null;
 let data = [];
@@ -150,7 +150,7 @@ function renderTable() {
   const sorted = applySort(filtered, cols, sortState);
 
   // Update customer count in toolbar
-  const countEl = container.querySelector("#customerCount");
+  const countEl = document.getElementById("customerCount");
   if (countEl) {
     countEl.textContent = `${filtered.length} customer${filtered.length === 1 ? "" : "s"}`;
   }

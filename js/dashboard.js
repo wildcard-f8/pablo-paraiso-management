@@ -3,9 +3,9 @@
            expenses by category (doughnut), bookings by status (doughnut),
            occupancy rate over time (bar).
 */
-import { api } from "./auth.js?v=23";
-import { utils } from "./utils.js?v=23";
-import { CONFIG } from "./config.js?v=23";
+import { api } from "./auth.js?v=24";
+import { utils } from "./utils.js?v=24";
+import { CONFIG } from "./config.js?v=24";
 
 let charts = {};
 let dashboardRoot = null;
