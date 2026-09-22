@@ -900,6 +900,7 @@ function requireAuth(e) {
       return { valid: false, email: null, status: 401, error: 'Invalid token. Please sign in again.' };
     }
     if (info.error || !info.email) {
+      logActivity({ action: "token_verification", status: "failed", details: info.error || "No email in token info", data: { tokenLength: token.length, actionParam: (e && e.parameter) ? e.parameter.action : null } });
       return { valid: false, email: null, status: 401, error: 'Invalid token. Please sign in again.' };
     }
 
