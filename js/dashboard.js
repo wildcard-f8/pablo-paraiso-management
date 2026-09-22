@@ -221,7 +221,7 @@ function renderDashboard(finances, bookings, supplies, customers) {
   el("statRevenue", utils.formatCurrency(totalIncome));
   el("statExpenses", utils.formatCurrency(totalExpenses));
   el("statNet", utils.formatCurrency(net));
-  el("statOccupancy", `${occupancy}%`);
+  el("statOccupancy", `${occupancy.toFixed(2)}%`);
   el("statBookings", activeBookings.length);
   el("statLowStock", lowStock.length);
 
@@ -236,7 +236,7 @@ function renderDashboard(finances, bookings, supplies, customers) {
   const trendOcc = dashboardRoot.querySelector("#trendOccupancy");
   if (trendOcc) {
     trendOcc.textContent = occupancy > 0
-      ? `${occupancy}% occupied in selected period`
+      ? `${occupancy.toFixed(2)}% occupied in selected period`
       : "No bookings in period";
     trendOcc.className = "card__trend " + (occupancy >= 50 ? "trend--positive" : occupancy === 0 ? "" : "trend--negative");
   }
