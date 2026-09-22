@@ -8,7 +8,7 @@ backend is a **Google Apps Script** web app backed by **Google Sheets** and
 ## Project structure
 
 ```
-pablo-paraiso-management/
+Web App/
 ├── SPEC.md              # API contract & data model (source of truth)
 ├── index.html           # App shell: top bar, sidebar, page slot, modal, toasts
 ├── css/style.css        # Design tokens, responsive layout, dark/light theme
@@ -160,7 +160,7 @@ message on every API call.
 
 ## Public Website Integration
 
-The marketing website at `pablo-paraiso/` has a booking form that now
+The marketing website at `Website/` has a booking form that now
 submits directly to **this** management app's GAS backend, so every
 website booking appears instantly in the management dashboard, the
 **Bookings** table, the calendar, and the finances chart.
@@ -200,7 +200,7 @@ calendar:
 1. Deploy the backend as a **Web app** → *Execute as*: **Me** →
    *Who has access*: **Anyone, even anonymous**.
 2. Copy the **Web app URL**.
-3. Paste into `Pablo Paraiso/index.html`:
+3. Paste into `Website/index.html`:
 ```js
 var GAS_ENDPOINT = "https://script.google.com/macros/s/YOUR-SCRIPT-ID/exec?action=submitPublicBooking";
 ```
