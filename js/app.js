@@ -74,7 +74,7 @@ const app = {
     });
     $("#themeToggle").addEventListener("click", () => app.toggleTheme());
 
-    /* Export button — saves a local CSV file with all backend data */
+    /* Export button — saves a single CSV file with all backend data */
     const exportBtn = $("#exportBtn");
     if (exportBtn) {
       exportBtn.addEventListener("click", () => {
