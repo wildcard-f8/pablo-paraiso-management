@@ -525,7 +525,7 @@ p { margin: 0 0 var(--space-3); }
   font-size: 2rem;
 }
 .card__value--positive { color: var(--color-success); }
-.card__value--primary { color: var(--color-primary-elev); }
+.card__value--primary { color: #ffffff; }
 .card__value--danger { color: var(--color-danger); }
 .card__trend {
   font-size: 0.8rem;
