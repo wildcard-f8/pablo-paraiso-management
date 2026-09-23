@@ -23,8 +23,15 @@ def test_public_booking_writes_the_actual_booking_status():
 def test_public_booking_rejects_oversized_or_malformed_input():
     text = source()
     assert "MAX_PUBLIC_BODY_BYTES" in text
+    assert "Utilities.newBlob(body).getBytes().length" in text
     assert "MAX_PUBLIC_FIELD_LENGTH" in text
     assert "data.website" in text
+    assert "^[A-Za-z0-9_-]{16,128}$" in text
+
+
+def test_public_errors_include_embedded_status_codes():
+    text = source()
+    assert "payload.status = status" in text
 
 
 def test_backend_has_production_health_endpoint():

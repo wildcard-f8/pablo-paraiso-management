@@ -232,7 +232,13 @@ function generateId(tabName, prefix) {
  */
 function sendJson(obj, status) {
   status = status || 200;
-  var output = ContentService.createTextOutput(JSON.stringify(obj));
+  var payload = obj;
+  if (status !== 200 && obj && typeof obj === 'object') {
+    payload = {};
+    for (var field in obj) payload[field] = obj[field];
+    payload.status = status;
+  }
+  var output = ContentService.createTextOutput(JSON.stringify(payload));
   // Set MIME type — try JSON first, fall back to TEXT
   try {
     output.setMimeType(ContentService.MimeType.JSON);
@@ -971,13 +977,15 @@ function getHealthStatus() {
       presentSheets = spreadsheet.getSheets().map(function(sheet) { return sheet.getName(); });
       missingSheets = requiredSheets.filter(function(name) { return presentSheets.indexOf(name) === -1; });
     } catch (err) {
-      return { healthy: false, checks: { sheet: false, calendarConfigured: !!calendarId }, error: 'Spreadsheet is not reachable.' };
+      return { healthy: false, checks: { sheet: false, calendarConfigured: !!calendarId, calendarReachable: false }, error: 'Spreadsheet is not reachable.' };
     }
   }
-  var healthy = !!sheetId && missingSheets.length === 0;
+  var calendarOk = false;
+  try { calendarOk = !!getCalendar(); } catch (calendarErr) { calendarOk = false; }
+  var healthy = !!sheetId && missingSheets.length === 0 && calendarOk;
   return {
     healthy: healthy,
-    checks: { sheet: !!sheetId && missingSheets.length === 0, calendarConfigured: !!calendarId },
+    checks: { sheet: !!sheetId && missingSheets.length === 0, calendarConfigured: !!calendarId, calendarReachable: calendarOk },
     missingSheets: missingSheets,
     backendVersion: '2026-09-booking-safety'
   };
@@ -1209,40 +1217,50 @@ var MAX_PUBLIC_FIELD_LENGTH = 500;
  */
 function submitPublicBooking(e) {
   var body = e && e.postData && e.postData.contents ? e.postData.contents : '';
-  if (body.length > MAX_PUBLIC_BODY_BYTES) {
+  var bodyBytes = body ? Utilities.newBlob(body).getBytes().length : 0;
+  if (bodyBytes > MAX_PUBLIC_BODY_BYTES) {
     return sendJson({ success: false, message: 'Request is too large.' }, 413);
   }
   var data;
   try { data = body ? JSON.parse(body) : null; } catch (err) {
     return sendJson({ success: false, message: 'Invalid request format.' }, 400);
   }
-  if (data && data.website) {
+  if (!data || typeof data !== 'object') {
+    return sendJson({ success: false, message: 'Request body is required.' }, 400);
+  }
+  if (data.website) {
     return sendJson({ success: false, message: 'Request rejected.' }, 400);
   }
-  var idempotencyKey = data && String(data.idempotencyKey || '').trim();
+  var idempotencyKey = String(data.idempotencyKey || '').trim();
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(idempotencyKey)) {
+    return sendJson({ success: false, message: 'A valid idempotency key is required.' }, 400);
+  }
   var cache = CacheService.getScriptCache();
-  var rateIdentity = data && data.email ? String(data.email).trim().toLowerCase() : 'unknown';
-  var rateKey = 'booking_rate_' + Utilities.base64EncodeWebSafe(
-    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, rateIdentity)
-  );
-  var recentAttempts = Number(cache.get(rateKey) || 0);
-  if (recentAttempts >= 5) {
-    return sendJson({ success: false, message: 'Too many booking attempts. Please try again later.' }, 429);
-  }
-  cache.put(rateKey, String(recentAttempts + 1), 600);
-  var cacheKey = idempotencyKey ? 'booking_idempotency_' + idempotencyKey.substring(0, 120) : '';
-  if (cacheKey && cache.get(cacheKey)) {
-    return sendJson({ success: false, message: 'This booking request has already been received.' }, 409);
-  }
+  var cacheKey = 'booking_idempotency_' + idempotencyKey;
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) {
     return sendJson({ success: false, message: 'The booking system is busy. Please try again.' }, 503);
   }
   try {
-    if (cacheKey) cache.put(cacheKey, 'pending', 600);
+    // Recheck and claim the idempotency key while holding the same lock used
+    // for availability. This closes the concurrent duplicate-submit race.
+    if (cache.get(cacheKey)) {
+      return sendJson({ success: false, message: 'This booking request has already been received.' }, 409);
+    }
+    var rateIdentity = String(data.email || '').trim().toLowerCase();
+    var rateKey = 'booking_rate_' + Utilities.base64EncodeWebSafe(
+      Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, rateIdentity)
+    );
+    var recentAttempts = Number(cache.get(rateKey) || 0);
+    if (recentAttempts >= 5) {
+      return sendJson({ success: false, message: 'Too many booking attempts. Please try again later.' }, 429);
+    }
+    cache.put(rateKey, String(recentAttempts + 1), 600);
+    cache.put(cacheKey, 'pending', 600);
+
     var response = submitPublicBookingUnlocked(e);
     var responseBody = response.getContent();
-    if (cacheKey && responseBody.indexOf('"success":true') === -1) cache.remove(cacheKey);
+    if (responseBody.indexOf('"success":true') === -1) cache.remove(cacheKey);
     return response;
   } finally {
     lock.releaseLock();
