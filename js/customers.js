@@ -4,9 +4,9 @@
    Note: firstBookingDate, lastBookingDate, and bookingCount are computed
    from the Bookings sheet (in the backend getCustomers() response).
 */
-import { api } from "./auth.js?v=46";
-import { utils } from "./utils.js?v=46";
-import { applySort, toggleSort, sortableHeader } from "./sort.js?v=46";
+import { api } from "./auth.js?v=49";
+import { utils } from "./utils.js?v=49";
+import { applySort, toggleSort, sortableHeader } from "./sort.js?v=49";
 
 let container = null;
 let data = [];

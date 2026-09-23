@@ -1,17 +1,17 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=46";
-import { api, auth } from "./auth.js?v=46";
-import { utils, $, $$ } from "./utils.js?v=46";
-import { createDashboard } from "./dashboard.js?v=46";
-import { createFinances } from "./finances.js?v=46";
-import { createCustomers } from "./customers.js?v=46";
-import { createBookings } from "./bookings.js?v=46";
-import { createCalendar } from "./calendar.js?v=46";
-import { createSupplies } from "./supplies.js?v=46";
-import { createWebsite } from "./website.js?v=46";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=46";
+import { CONFIG } from "./config.js?v=49";
+import { api, auth } from "./auth.js?v=49";
+import { utils, $, $$ } from "./utils.js?v=49";
+import { createDashboard } from "./dashboard.js?v=49";
+import { createFinances } from "./finances.js?v=49";
+import { createCustomers } from "./customers.js?v=49";
+import { createBookings } from "./bookings.js?v=49";
+import { createCalendar } from "./calendar.js?v=49";
+import { createSupplies } from "./supplies.js?v=49";
+import { createWebsite } from "./website.js?v=49";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=49";
 
 
 let currentParams = {};
@@ -336,6 +336,15 @@ const app = {
     const hash = window.location.hash.slice(2) || "dashboard"; // drop leading '#/'
     const [name, ...rest] = hash.split("/");
     currentParams = { raw: hash, page: name, args: rest };
+    if (!auth.isAuthed()) {
+      this.updateNav(name);
+      this.setTitle(ROUTES[name]?.label || "Pablo Paraiso Management");
+      const slot = $("#pageSlot");
+      if (slot) {
+        slot.innerHTML = `<div class="auth-required-page"><h3>Sign in required</h3><p>Sign in with Google to load your dashboard data.</p></div>`;
+      }
+      return;
+    }
     this.navigate(name, rest);
   },
 
@@ -841,7 +850,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=46";
+export { utils, $, $$ } from "./utils.js?v=49";
 
 /* Export app and default */
 export { app };

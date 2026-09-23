@@ -974,7 +974,17 @@ p { margin: 0 0 var(--space-3); }
 }
 .empty-state img { width: 80px; opacity: .35; margin-bottom: var(--space-4); }
 
-/* ── Footer ── */
+.auth-required-page {
+  min-height: 320px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: var(--color-text-dim);
+}
+.auth-required-page h3 { color: var(--color-text); margin-bottom: var(--space-2); }
+.auth-required-page p { margin: 0; }
+
+
 footer.page-footer {
   text-align: center;
   padding: var(--space-6);
