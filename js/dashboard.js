@@ -3,9 +3,9 @@
            expenses by category (doughnut), bookings by status (doughnut),
            occupancy rate over time (bar).
 */
-import { api } from "./auth.js?v=41";
-import { utils } from "./utils.js?v=41";
-import { CONFIG } from "./config.js?v=41";
+import { api } from "./auth.js?v=42";
+import { utils } from "./utils.js?v=42";
+import { CONFIG } from "./config.js?v=42";
 
 let charts = {};
 let dashboardRoot = null;
@@ -74,7 +74,7 @@ export function createDashboard(_args, ref) {
       <div class="card card--stat"><div class="card__label">Net Profit</div><div class="card__value" id="statNet">—</div><div class="card__trend" id="trendNet"></div></div>
       <div class="card card--stat"><div class="card__label">Occupancy Rate</div><div class="card__value" id="statOccupancy">—</div><div class="card__trend" id="trendOccupancy"></div></div>
       <div class="card card--stat"><div class="card__label">Active Bookings</div><div class="card__value" id="statBookings">—</div><div class="card__trend" id="trendBookings"></div></div>
-      <div class="card card--stat"><div class="card__label">Low Stock Items</div><div class="card__value" id="statLowStock">—</div><div class="card__trend" id="trendLowStock"></div></div>
+      <div class="card card--stat"><div class="card__label">Low Stock Items</div><div class="card__value card__value--danger" id="statLowStock">—</div><div class="card__trend" id="trendLowStock"></div></div>
     </div>
 
     <div class="charts-grid">
