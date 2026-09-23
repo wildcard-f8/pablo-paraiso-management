@@ -1064,6 +1064,7 @@ function doGet(e) {
   try {
     var result;
     switch (action) {
+      case 'getDashboardData':   result = { finances: getFinances(), bookings: getBookings(), supplies: getSupplies() }; break;
       case 'authCheck':         result = { authenticated: true, email: _ga.email }; break;
       case 'getFinances':       result = getFinances(); break;
       case 'getCustomers':      result = getCustomers(); break;

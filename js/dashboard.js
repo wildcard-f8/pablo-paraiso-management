@@ -3,9 +3,9 @@
            expenses by category (doughnut), bookings by status (doughnut),
            occupancy rate over time (bar).
 */
-import { api } from "./auth.js?v=50";
-import { utils } from "./utils.js?v=50";
-import { CONFIG } from "./config.js?v=50";
+import { api } from "./auth.js?v=51";
+import { utils } from "./utils.js?v=51";
+import { CONFIG } from "./config.js?v=51";
 
 let charts = {};
 let dashboardRoot = null;
@@ -145,18 +145,15 @@ export function createDashboard(_args, ref) {
 async function loadDashboard() {
   const myGeneration = loadGeneration;
   /* Only show the page loader if we need to fetch from the backend.
-     If all data is in the cache (sessionStorage), the Promise.all
-     below resolves in milliseconds — no need for a spinner flash. */
-  const allCached = api.isCached("getFinances") &&
-    api.isCached("getBookings") &&
-    api.isCached("getSupplies");
-  if (!allCached) appRef.showPageLoader("Starting up backend (may take a few seconds)…");
+     If the combined response is in the cache, rendering resolves in
+     milliseconds — no need for a spinner flash. */
+  const allCached = api.isCached("getDashboardData");
+  if (!allCached) appRef.showPageLoader("Loading dashboard data…");
   try {
-    const [finances, bookings, supplies] = await Promise.all([
-      api.get("getFinances"),
-      api.get("getBookings"),
-      api.get("getSupplies"),
-    ]);
+    const dashboardData = await api.get("getDashboardData");
+    const finances = dashboardData?.finances || [];
+    const bookings = dashboardData?.bookings || [];
+    const supplies = dashboardData?.supplies || [];
 
     // Guard: if a newer dashboard load was kicked off, abandon this one
     if (myGeneration !== loadGeneration) { appRef.hidePageLoader(); return; }
