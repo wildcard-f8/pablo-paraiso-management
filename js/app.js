@@ -1,17 +1,17 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=51";
-import { api, auth } from "./auth.js?v=51";
-import { utils, $, $$ } from "./utils.js?v=51";
-import { createDashboard } from "./dashboard.js?v=51";
-import { createFinances } from "./finances.js?v=51";
-import { createCustomers } from "./customers.js?v=51";
-import { createBookings } from "./bookings.js?v=51";
-import { createCalendar } from "./calendar.js?v=51";
-import { createSupplies } from "./supplies.js?v=51";
-import { createWebsite } from "./website.js?v=51";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=51";
+import { CONFIG } from "./config.js?v=52";
+import { api, auth } from "./auth.js?v=52";
+import { utils, $, $$ } from "./utils.js?v=52";
+import { createDashboard } from "./dashboard.js?v=52";
+import { createFinances } from "./finances.js?v=52";
+import { createCustomers } from "./customers.js?v=52";
+import { createBookings } from "./bookings.js?v=52";
+import { createCalendar } from "./calendar.js?v=52";
+import { createSupplies } from "./supplies.js?v=52";
+import { createWebsite } from "./website.js?v=52";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=52";
 
 
 let currentParams = {};
@@ -187,8 +187,19 @@ const app = {
           window.dispatchEvent(new CustomEvent("refreshData"));
           return;
         }
-        /* First-time sign-in (or token restore on page load): show
-           "verifying…" spinner while we test the token against backend. */
+        /* Replace the pre-auth placeholder immediately so the main body
+           never suggests that the user must sign in again while the token is
+           being verified and the dashboard is starting. */
+        const loadingSlot = $("#pageSlot");
+        if (loadingSlot) {
+          loadingSlot.innerHTML = `
+            <div class="auth-loading-page" role="status" aria-live="polite">
+              <span class="spinner"></span>
+              <h3>Loading your dashboard</h3>
+              <p>Verifying your account and loading the latest data&hellip;</p>
+            </div>
+          `;
+        }
         gate.classList.remove("auth-gate__hidden");
         gate.classList.remove("app-authed");
         /* Clear any cached API responses from a previous session so we
@@ -842,7 +853,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=51";
+export { utils, $, $$ } from "./utils.js?v=52";
 
 /* Export app and default */
 export { app };
