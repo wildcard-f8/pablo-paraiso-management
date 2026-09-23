@@ -516,6 +516,14 @@ p { margin: 0 0 var(--space-3); }
 .card--stat .card__value {
   text-align: center;
 }
+.card--stat:has(.card__trend:empty) .card__trend {
+  display: none;
+}
+.card--stat:has(.card__trend:empty) .card__value {
+  margin-top: auto;
+  margin-bottom: auto;
+  font-size: 2rem;
+}
 .card__value--danger { color: var(--color-danger); }
 .card__trend {
   font-size: 0.8rem;
@@ -531,6 +539,7 @@ p { margin: 0 0 var(--space-3); }
 .card__trend.trend--negative { color: var(--color-danger); }
 @media (max-width: 500px) {
   .card__value { font-size: 1.4rem; }
+  .card--stat:has(.card__trend:empty) .card__value { font-size: 1.6rem; }
   .card--stat { padding: var(--space-4); }
 }
 
