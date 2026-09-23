@@ -3,9 +3,9 @@
            expenses by category (doughnut), bookings by status (doughnut),
            occupancy rate over time (bar).
 */
-import { api } from "./auth.js?v=42";
-import { utils } from "./utils.js?v=42";
-import { CONFIG } from "./config.js?v=42";
+import { api } from "./auth.js?v=46";
+import { utils } from "./utils.js?v=46";
+import { CONFIG } from "./config.js?v=46";
 
 let charts = {};
 let dashboardRoot = null;
@@ -71,8 +71,8 @@ export function createDashboard(_args, ref) {
     <div class="stats-grid" id="statsGrid">
       <div class="card card--stat"><div class="card__label">Total Revenue</div><div class="card__value" id="statRevenue">—</div><div class="card__trend" id="trendRevenue"></div></div>
       <div class="card card--stat"><div class="card__label">Total Expenses</div><div class="card__value" id="statExpenses">—</div><div class="card__trend" id="trendExpenses"></div></div>
-      <div class="card card--stat"><div class="card__label">Net Profit</div><div class="card__value" id="statNet">—</div><div class="card__trend" id="trendNet"></div></div>
-      <div class="card card--stat"><div class="card__label">Occupancy Rate</div><div class="card__value" id="statOccupancy">—</div><div class="card__trend" id="trendOccupancy"></div></div>
+      <div class="card card--stat"><div class="card__label">Net Profit</div><div class="card__value" id="statNet">—</div></div>
+      <div class="card card--stat"><div class="card__label">Occupancy Rate</div><div class="card__value" id="statOccupancy">—</div></div>
       <div class="card card--stat"><div class="card__label">Active Bookings</div><div class="card__value" id="statBookings">—</div><div class="card__trend" id="trendBookings"></div></div>
       <div class="card card--stat"><div class="card__label">Low Stock Items</div><div class="card__value card__value--danger" id="statLowStock">—</div><div class="card__trend" id="trendLowStock"></div></div>
     </div>
@@ -221,21 +221,12 @@ function renderDashboard(finances, bookings, supplies) {
   el("statBookings", activeBookings.length);
   el("statLowStock", lowStock.length);
 
-  const trendNet = dashboardRoot.querySelector("#trendNet");
-  if (trendNet) {
-    trendNet.textContent = net >= 0
-      ? `Net positive: ${utils.formatCurrency(net)}`
-      : `Net negative: ${utils.formatCurrency(Math.abs(net))}`;
-    trendNet.className = "card__trend " + (net >= 0 ? "trend--positive" : "trend--negative");
+  const netValue = dashboardRoot.querySelector("#statNet");
+  if (netValue) {
+    netValue.className = `card__value ${net >= 0 ? "card__value--positive" : "card__value--danger"}`;
   }
-
-  const trendOcc = dashboardRoot.querySelector("#trendOccupancy");
-  if (trendOcc) {
-    trendOcc.textContent = occupancy > 0
-      ? `${occupancy.toFixed(2)}% occupied in selected period`
-      : "No bookings in period";
-    trendOcc.className = "card__trend " + (occupancy >= 50 ? "trend--positive" : occupancy === 0 ? "" : "trend--negative");
-  }
+  const occupancyValue = dashboardRoot.querySelector("#statOccupancy");
+  if (occupancyValue) occupancyValue.className = "card__value card__value--primary";
 
   renderCharts(finances, bookings, supplies);
 }
