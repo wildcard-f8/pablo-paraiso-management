@@ -1,17 +1,17 @@
 /* app.js - Main router, navigation, theme, and shared helpers.
    Imports page modules on demand. Mounts the active page into #pageSlot.
 */
-import { CONFIG } from "./config.js?v=49";
-import { api, auth } from "./auth.js?v=49";
-import { utils, $, $$ } from "./utils.js?v=49";
-import { createDashboard } from "./dashboard.js?v=49";
-import { createFinances } from "./finances.js?v=49";
-import { createCustomers } from "./customers.js?v=49";
-import { createBookings } from "./bookings.js?v=49";
-import { createCalendar } from "./calendar.js?v=49";
-import { createSupplies } from "./supplies.js?v=49";
-import { createWebsite } from "./website.js?v=49";
-import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=49";
+import { CONFIG } from "./config.js?v=50";
+import { api, auth } from "./auth.js?v=50";
+import { utils, $, $$ } from "./utils.js?v=50";
+import { createDashboard } from "./dashboard.js?v=50";
+import { createFinances } from "./finances.js?v=50";
+import { createCustomers } from "./customers.js?v=50";
+import { createBookings } from "./bookings.js?v=50";
+import { createCalendar } from "./calendar.js?v=50";
+import { createSupplies } from "./supplies.js?v=50";
+import { createWebsite } from "./website.js?v=50";
+import { exportSpreadsheet, importSpreadsheet } from "./export.js?v=50";
 
 
 let currentParams = {};
@@ -203,29 +203,21 @@ const app = {
             /* Token is valid and user is authorized — reveal the app */
             hideVerifying();
             syncGate();
-            /* Preload all entity data in parallel to warm the 60s cache.
-             * This eliminates cold-start latency when the user navigates
-             * to any page. Silently fail — individual pages will retry
-             * on their own with their own loading states. */
-            Promise.all([
-              api.get("getFinances"),
-              api.get("getBookings"),
-              api.get("getCustomers"),
-              api.get("getSupplies"),
-            ]).catch(() => {});
-            /* Fetch website content to apply dynamic logo */
+            /* Navigate immediately. The active page fetches only the data it
+               needs; preloading the same endpoints here caused duplicate
+               concurrent requests and made first dashboard load slower. */
+            app.navigate(currentParams.page || "dashboard", currentParams.args);
+            /* Apply the dynamic logo in the background without delaying the
+               dashboard data request. */
             api.get("getWebsiteContent").then((data) => {
               if (data && data.logo) {
-                const logoIcons = document.querySelectorAll(".logo__icon");
-                logoIcons.forEach((img) => {
+                document.querySelectorAll(".logo__icon").forEach((img) => {
                   if (img.src.includes("logo_transparent") || img.src.includes("house")) {
                     img.src = data.logo + (data.logo.includes("?") ? "&v=" : "?v=") + Date.now();
                   }
                 });
               }
             }).catch(() => {});
-            /* Navigate to dashboard (or whatever hash was set) */
-            app.navigate(currentParams.page || "dashboard", currentParams.args);
           })
           .catch((err) => {
             /* Auth probe failed — likely GAS cold start (non-JSON 404)
@@ -850,7 +842,7 @@ function createAbout() {
 
 /* Shared helpers re-exported for backward compat with modules that
    import utils from app.js. New code should import from ./utils.js directly. */
-export { utils, $, $$ } from "./utils.js?v=49";
+export { utils, $, $$ } from "./utils.js?v=50";
 
 /* Export app and default */
 export { app };
