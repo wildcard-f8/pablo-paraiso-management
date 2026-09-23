@@ -13,7 +13,7 @@ access.
 
 2. **Paste this code**
 
-   Replace the default `Code.gs` contents with the contents of `code.gs` in
+   Replace the default `Code.gs` contents with the contents of `Code.js` in
    this folder.
 
 3. **Initialize the database (seeding)**

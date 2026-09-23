@@ -9,7 +9,7 @@
 
 ## API Contract
 
-Backend URL: `https://script.google.com/macros/s/[SCRIPT_ID]/dev`
+Backend URL: `https://script.google.com/macros/s/[SCRIPT_ID]/exec`
 
 All responses: `{ "success": true, "data": ... }` or `{ "success": false, "error": "..." }`
 
@@ -19,7 +19,8 @@ All responses: `{ "success": true, "data": ... }` or `{ "success": false, "error
 - `?action=getBookings` → array of Booking records
 - `?action=getSupplies` → array of Supply records
 - `?action=getCalendarEvents&start=ISO&end=ISO` → array of CalendarEvent records (from the configured CALENDAR_ID)
-- `?action=submitPublicBooking` *(public — no auth)* → `{success, message, bookingId, eventId}`
+- `?action=getWebsiteContent&key=...` → public website content
+- `?action=healthCheck` → public backend configuration and sheet health summary
 
 ### POST Endpoints (JSON body)
 - `?action=addFinance` body: `{date,type,category,description,amount,bookingId}`
@@ -37,8 +38,8 @@ All responses: `{ "success": true, "data": ... }` or `{ "success": false, "error
 - `?action=addCalendarEvent` body: `{bookingId,title,start,end,allDay,color}`
 - `?action=updateCalendarEvent` body: `{id,title,start,end,allDay,color}`
 - `?action=deleteCalendarEvent` body: `{id}`
-| `- `?action=submitPublicBooking` *(public — no auth)* body: `{name,email,phone,eventType,date,timeSlot,guests,package,budget,message}` — maps to Booking + Customer + CalendarEvent on the management app's sheet/calendar
-| `- `?action=mergeSpreadsheet` body: `{data:{finances[],customers[],bookings[],supplies[]}}` → `{success,added,updated,preserved,conflicts[],errors[]}` — merges a local JSON backup with online data
+- `?action=submitPublicBooking` *(public — no auth)* body: `{name,email,phone,eventType,date,timeSlot,guests,package,budget,message,idempotencyKey}` — maps to Booking + Customer + CalendarEvent on the management app's sheet/calendar
+- `?action=mergeSpreadsheet` body: `{data:{finances[],customers[],bookings[],supplies[]}}` → `{success,added,updated,preserved,conflicts[],errors[]}` — merges a local JSON backup with online data
 
 ## Data Models
 

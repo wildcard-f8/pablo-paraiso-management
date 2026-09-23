@@ -958,6 +958,31 @@ function requireAuth(e) {
 
 /* ==========================================================================\n * GET ROUTING — doGet(e)  (action in e.parameter)\n * ========================================================================== */
 
+function getHealthStatus() {
+  var properties = PropertiesService.getScriptProperties();
+  var sheetId = properties.getProperty('SHEET_ID');
+  var calendarId = properties.getProperty('CALENDAR_ID') || 'primary';
+  var requiredSheets = ['Finances', 'Customers', 'Bookings', 'Supplies', 'Config', 'ActivityLog', 'WebBookings'];
+  var presentSheets = [];
+  var missingSheets = requiredSheets.slice();
+  if (sheetId) {
+    try {
+      var spreadsheet = SpreadsheetApp.openById(sheetId);
+      presentSheets = spreadsheet.getSheets().map(function(sheet) { return sheet.getName(); });
+      missingSheets = requiredSheets.filter(function(name) { return presentSheets.indexOf(name) === -1; });
+    } catch (err) {
+      return { healthy: false, checks: { sheet: false, calendarConfigured: !!calendarId }, error: 'Spreadsheet is not reachable.' };
+    }
+  }
+  var healthy = !!sheetId && missingSheets.length === 0;
+  return {
+    healthy: healthy,
+    checks: { sheet: !!sheetId && missingSheets.length === 0, calendarConfigured: !!calendarId },
+    missingSheets: missingSheets,
+    backendVersion: '2026-09-booking-safety'
+  };
+}
+
 function doGet(e) {
   var action = e.parameter.action;
   if (!action) {
@@ -969,6 +994,10 @@ function doGet(e) {
      render dynamically without requiring user authentication. */
   if (action === 'getWebsiteContent') {
     return sendSuccess(getWebsiteContent(e.parameter.key));
+  }
+
+  if (action === 'healthCheck') {
+    return sendSuccess(getHealthStatus());
   }
 
   /* Diagnostic endpoint is intentionally disabled in production. */
@@ -1170,6 +1199,55 @@ var PACKAGE_DURATIONS_HOURS = {
 };
 
 var PUBLIC_TIME_SLOTS = ["09:00", "13:00", "14:00", "17:00"];
+var MAX_PUBLIC_BODY_BYTES = 20000;
+var MAX_PUBLIC_FIELD_LENGTH = 500;
+
+/**
+ * Public booking guard. Serialises availability checks and writes so two
+ * simultaneous requests cannot reserve the same slot. An idempotency key
+ * prevents double-submits from creating duplicate records.
+ */
+function submitPublicBooking(e) {
+  var body = e && e.postData && e.postData.contents ? e.postData.contents : '';
+  if (body.length > MAX_PUBLIC_BODY_BYTES) {
+    return sendJson({ success: false, message: 'Request is too large.' }, 413);
+  }
+  var data;
+  try { data = body ? JSON.parse(body) : null; } catch (err) {
+    return sendJson({ success: false, message: 'Invalid request format.' }, 400);
+  }
+  if (data && data.website) {
+    return sendJson({ success: false, message: 'Request rejected.' }, 400);
+  }
+  var idempotencyKey = data && String(data.idempotencyKey || '').trim();
+  var cache = CacheService.getScriptCache();
+  var rateIdentity = data && data.email ? String(data.email).trim().toLowerCase() : 'unknown';
+  var rateKey = 'booking_rate_' + Utilities.base64EncodeWebSafe(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, rateIdentity)
+  );
+  var recentAttempts = Number(cache.get(rateKey) || 0);
+  if (recentAttempts >= 5) {
+    return sendJson({ success: false, message: 'Too many booking attempts. Please try again later.' }, 429);
+  }
+  cache.put(rateKey, String(recentAttempts + 1), 600);
+  var cacheKey = idempotencyKey ? 'booking_idempotency_' + idempotencyKey.substring(0, 120) : '';
+  if (cacheKey && cache.get(cacheKey)) {
+    return sendJson({ success: false, message: 'This booking request has already been received.' }, 409);
+  }
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) {
+    return sendJson({ success: false, message: 'The booking system is busy. Please try again.' }, 503);
+  }
+  try {
+    if (cacheKey) cache.put(cacheKey, 'pending', 600);
+    var response = submitPublicBookingUnlocked(e);
+    var responseBody = response.getContent();
+    if (cacheKey && responseBody.indexOf('"success":true') === -1) cache.remove(cacheKey);
+    return response;
+  } finally {
+    lock.releaseLock();
+  }
+}
 
 /**
  * Public endpoint — receives booking form submissions from the website.
@@ -1178,7 +1256,7 @@ var PUBLIC_TIME_SLOTS = ["09:00", "13:00", "14:00", "17:00"];
  * @param {Object} e — the doPost event parameter
  * @return {ContentOutput}
  */
-function submitPublicBooking(e) {
+function submitPublicBookingUnlocked(e) {
   var clientIP = (e.parameter && e.parameter.ip) || "website";
 
   // Parse JSON body (sent as text/plain to avoid CORS preflight)
@@ -1266,14 +1344,14 @@ function submitPublicBooking(e) {
     }
 
     /* ─── Also write to WebBookings sheet (audit trail for website submissions) ─── */
-    writeWebBookingRow(data, booking.id, calendarEventId, now, clientIP);
+    writeWebBookingRow(data, booking.id, calendarEventId, now, clientIP, booking.status);
 
     logPublicActivity("booking_request", "success", data,
       "Booking confirmed. BID: " + booking.id + ", EID: " + calendarEventId, clientIP);
 
     return sendJson({
       success: true,
-      message: "Your booking has been confirmed! We will contact you within 2 hours to finalize the details.",
+      message: "Your booking request has been received! We will contact you within 2 hours to finalize the details.",
       bookingId: booking.id,
       eventId: calendarEventId
     });
@@ -1305,7 +1383,14 @@ function validatePublicBooking(data) {
     }
   }
   var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(data.email)) {
+  var fieldsToLimit = ["name", "email", "phone", "eventType", "date", "timeSlot", "package", "budget", "message", "specialRequests"];
+  for (var li = 0; li < fieldsToLimit.length; li++) {
+    var limitedField = fieldsToLimit[li];
+    if (data[limitedField] != null && String(data[limitedField]).length > MAX_PUBLIC_FIELD_LENGTH) {
+      return { isValid: false, error: "One or more fields are too long." };
+    }
+  }
+  if (!emailRegex.test(String(data.email).trim())) {
     return { isValid: false, error: "Please enter a valid email address." };
   }
   var inputDate = new Date(data.date);
@@ -1447,7 +1532,7 @@ function findOrCreateCustomer(name, email, phone) {
  * @param {Date} timestamp
  * @param {string} clientIP
  */
-function writeWebBookingRow(data, bookingId, eventId, timestamp, clientIP) {
+function writeWebBookingRow(data, bookingId, eventId, timestamp, clientIP, bookingStatus) {
   try {
     var sheet = getSheet("WebBookings");
     var row = [
@@ -1465,7 +1550,7 @@ function writeWebBookingRow(data, bookingId, eventId, timestamp, clientIP) {
       PACKAGE_DURATIONS_HOURS[data.package] || 6,
       eventId || "",
       data.message || "",
-      booking.status || "pending",
+      bookingStatus || "pending",
       JSON.stringify(data)
     ];
     sheet.appendRow(row);
