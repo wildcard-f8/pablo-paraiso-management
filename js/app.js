@@ -196,9 +196,9 @@ const app = {
         api.clearCache();
         showVerifying();
 
-        /* Probe the backend — a successful call proves the token is
-         * valid AND the user is on the allow-list. */
-        api.get("getCustomers")
+        /* Probe the lightweight auth endpoint — a successful call proves
+         * the token is valid AND the user is on the allow-list. */
+        api.get("authCheck")
           .then(() => {
             /* Token is valid and user is authorized — reveal the app */
             hideVerifying();
